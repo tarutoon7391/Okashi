@@ -1,0 +1,10 @@
+.git
+.github
+lib
+docs
+*.md
+*.bat
+.env
+.editorconfig
+img/product/*
+!img/product/.gitkeep

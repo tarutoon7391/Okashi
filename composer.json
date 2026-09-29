@@ -1,0 +1,14 @@
+{
+    "name": "tarutoon7391/okashi",
+    "description": "お土産屋さん用 発注管理システム",
+    "type": "project",
+    "require": {
+        "php": ">=8.1",
+        "tecnickcom/tcpdf": "^6.7",
+        "phpmailer/phpmailer": "^6.9"
+    },
+    "config": {
+        "vendor-dir": "lib",
+        "sort-packages": true
+    }
+}

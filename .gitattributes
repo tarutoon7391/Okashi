@@ -1,0 +1,10 @@
+# 改行は LF にそろえる（命名規則 4.2）。Windows でも git が自動で変換する
+* text=auto eol=lf
+*.bat text eol=crlf
+*.png binary
+*.jpg binary
+*.gif binary
+*.webp binary
+*.xlsx binary
+*.docx binary
+*.pdf binary

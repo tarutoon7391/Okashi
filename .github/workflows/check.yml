@@ -1,0 +1,38 @@
+# プルリクエストと main への push で自動チェック
+#  ・全 PHP ファイルの構文チェック（php -l）
+#  ・SQL（01 → 02 → 03）が MySQL 8 で最後まで流れるか
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd="mysqladmin ping -proot"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+          extensions: pdo_mysql
+      - name: PHP 構文チェック
+        run: |
+          find . -name '*.php' -not -path './lib/*' -print0 | xargs -0 -n1 php -l > /dev/null
+          echo "OK"
+      - name: SQL が流れるか（01 → 02 → 03）
+        env:
+          DB_HOST: 127.0.0.1
+          DB_USER: root
+          DB_PASS: root
+        run: php tools/db_init.php --test

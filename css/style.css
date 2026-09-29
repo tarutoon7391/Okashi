@@ -1,0 +1,104 @@
+/* 共通スタイル（05 §7）担当A
+   状態色（.qty-minus / .status-* / .row-return / .stock-warning / .storage-*）は各画面で必ずこれを使う（質問No.13） */
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: "Yu Gothic UI", "Meiryo", sans-serif; font-size: 15px; color: #222; background: #f7f7f5; }
+
+/* ヘッダ */
+.app-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 16px; background: #2b4c7e; color: #fff; }
+.app-header a { color: #fff; }
+.app-title { font-weight: bold; text-decoration: none; }
+.app-nav { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+
+/* 本文 */
+.container { max-width: 1100px; margin: 0 auto; padding: 16px; }
+h1 { font-size: 20px; margin: 0 0 12px; }
+h2 { font-size: 16px; margin: 20px 0 8px; border-left: 4px solid #2b4c7e; padding-left: 8px; }
+
+/* 一覧テーブル */
+.data-table { width: 100%; border-collapse: collapse; background: #fff; margin: 8px 0; }
+.data-table th, .data-table td { border: 1px solid #ccc; padding: 4px 8px; vertical-align: middle; }
+.data-table th { background: #e6ecf5; text-align: left; white-space: nowrap; }
+.data-table tbody tr:nth-child(even) { background: #fafafa; }
+.data-table input[type="number"] { width: 6em; text-align: right; }
+.data-table input[type="text"] { width: 100%; }
+.data-table tfoot td { font-weight: bold; background: #f0f0f0; }
+
+/* 登録・編集フォーム */
+.form-grid { display: grid; grid-template-columns: 10em 1fr; gap: 8px 12px; align-items: center; max-width: 640px; margin: 8px 0; }
+@media (max-width: 600px) {
+    .form-grid { grid-template-columns: 1fr; }
+    .container { padding: 8px; }
+    .data-table { font-size: 13px; }
+}
+
+/* ボタン */
+.btn { display: inline-block; padding: 6px 16px; border: 1px solid #999; border-radius: 4px; background: #fff; color: #222; cursor: pointer; font-size: 14px; text-decoration: none; }
+.btn-primary { background: #2b6cb0; border-color: #2b6cb0; color: #fff; }
+.btn-danger { background: #c53030; border-color: #c53030; color: #fff; }
+.btn-area { margin: 12px 0; display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* メッセージ帯 */
+.flash { padding: 8px 16px; }
+.flash-success { background: #e6f4ea; color: #1e6b34; }
+.flash-error { background: #fde8e8; color: #9b1c1c; }
+.flash-warning { background: #fff1dc; color: #9a4a00; }
+
+/* 数値・状態 */
+.num { text-align: right; white-space: nowrap; }
+.qty-minus, .qty-minus td { color: #c53030; }
+.status-unconfirmed { background: #fff6bf; }
+.status-confirmed { color: #1e6b34; font-weight: bold; }
+.row-return, .row-return td { background: #efe6f7; }
+.stock-warning, .stock-warning td { background: #fcdada; }
+.storage-chilled, .storage-frozen { display: inline-block; font-size: 12px; padding: 0 6px; border-radius: 3px; color: #fff; margin-left: 4px; }
+.storage-chilled { background: #4fb3d9; }
+.storage-frozen { background: #2b4c9e; }
+
+/* ボタン（小）・行内フォーム */
+.btn-small { padding: 2px 10px; font-size: 13px; }
+.inline-form { display: inline; }
+.nowrap { white-space: nowrap; }
+
+/* 絞り込みフォーム（明細表・集計・一覧の上） */
+.filter-form { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; background: #fff; border: 1px solid #ddd; padding: 8px 12px; margin: 8px 0; }
+.filter-form label { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+
+/* 明細表のグループ見出し・小計 */
+.data-table .group-row td { background: #dbe4f0; font-weight: bold; }
+.data-table .subtotal-row td { background: #f3f3f3; font-weight: bold; }
+.inner-table { border-collapse: collapse; width: 100%; }
+.inner-table td { border: none; border-bottom: 1px dotted #ccc; padding: 2px 6px; }
+.inner-table tr:last-child td { border-bottom: none; }
+
+/* 文字 */
+.note { font-size: 13px; color: #555; }
+.dev-note { font-size: 14px; background: #fffbe6; border: 1px dashed #d9b400; padding: 6px 10px; }
+.error-text { color: #c53030; }
+.req { font-size: 11px; color: #fff; background: #c53030; border-radius: 3px; padding: 0 4px; }
+.radio { margin-right: 12px; white-space: nowrap; }
+
+/* ログイン */
+.login-box { max-width: 480px; background: #fff; border: 1px solid #ddd; padding: 16px; }
+
+/* メニュー */
+.menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.menu-group { background: #fff; border: 1px solid #ddd; padding: 4px 16px 12px; }
+.menu-group ul { margin: 0; padding-left: 20px; line-height: 2; }
+.badge { display: inline-block; font-size: 12px; background: #fff6bf; border: 1px solid #d9b400; border-radius: 10px; padding: 0 8px; line-height: 1.6; }
+
+/* 商品写真 */
+.thumb { width: 48px; height: 48px; object-fit: cover; }
+.thumb-large { max-width: 200px; max-height: 200px; }
+
+/* 円グラフ（SC-69） */
+.chart-layout { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+.chart-layout .data-table { flex: 1 1 520px; width: auto; }
+.chart-box { flex: 0 0 320px; background: #fff; border: 1px solid #ddd; padding: 8px; }
+.chart-box canvas { max-width: 100%; height: auto; }
+.legend-color { display: inline-block; width: 14px; height: 14px; border-radius: 2px; vertical-align: middle; }
+
+/* 横に長い表はスマホで横スクロール */
+@media (max-width: 600px) {
+    .data-table { display: block; overflow-x: auto; }
+}

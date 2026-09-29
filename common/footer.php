@@ -1,0 +1,7 @@
+</main>
+<script src="/js/common.js?v=1"></script>
+<?php if (isset($pageScript)): ?>
+<script src="/js/<?= h($pageScript) ?>?v=1"></script>
+<?php endif; ?>
+</body>
+</html>
