@@ -41,8 +41,8 @@
 ├─ img/product/           商品写真（アップロード先）
 ├─ sql/                   01_create_tables / 02_insert_master / 03_test_data
 ├─ template/              画面テンプレート（新しい画面はここからコピー）
-├─ tools/db_init.php      DB 初期化（コマンドライン専用）
-├─ docs/                  画面設計・テスト仕様書
+├─ tools/                db_init.php（DB初期化）・slip_test.php（在庫更新の自動テスト）
+├─ docs/                  画面設計・テスト仕様書・結合手順書・デモシナリオ・発表資料骨子
 │   └─ 設計書/            要件定義書・01〜06・03作業指示書（元ファイル）
 │
 ├─ Dockerfile / docker/   Railway 用（Apache + PHP 8.2）
