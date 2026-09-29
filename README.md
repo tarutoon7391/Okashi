@@ -110,8 +110,11 @@ C:\xampp\php\php.exe composer.phar install
 ### メール（二要素認証・発注書）について
 
 - Railway は **Free / Hobby プランだと SMTP（Gmail など）が使えません**（Pro 以上のみ）。
-  - Hobby のままメールを送るなら **Resend**（HTTP でメールを送るサービス。無料枠あり）を使う：
-    `MAIL_DRIVER=resend` / `RESEND_API_KEY=…` / `MAIL_FROM=（Resend で認証したドメインのアドレス）`
+  - Hobby のままメールを送るなら **Resend**（HTTP でメールを送るサービス。無料枠あり）を使う（このリポジトリの設定）：
+    `MAIL_DRIVER=resend` / `RESEND_API_KEY=re_…` / `MAIL_REDIRECT_TO=（Resend に登録したメールアドレス）`
+  - 独自ドメインを持っていない場合、Resend は送信元が `onboarding@resend.dev` 固定で、**Resend に登録した本人のアドレスにしか届かない**。
+    そのため `MAIL_REDIRECT_TO` を設定して、ワンタイムコード・発注書メールをすべて総括のアドレスに集める（件名に本来の宛先が付く）。
+    独自ドメインを Resend で認証したら `MAIL_FROM` を設定し、`MAIL_REDIRECT_TO` を消せば本来の宛先に届く
   - Pro プランなら Gmail：`MAIL_DRIVER=smtp` / `SMTP_USER=…@gmail.com` / `SMTP_PASS=（アプリパスワード）` / `MAIL_FROM=…@gmail.com`
 - 発表デモなどでメールを使わないなら `MAIL_DRIVER=log` のままで OK（コードが画面に出る）。
 - `sql/02_insert_master.sql` のメールアドレスは `xxxx@gmail.com` のダミー。実際に受け取るなら書き換えるか、操作者マスタ画面で変更する。
@@ -164,7 +167,7 @@ git push -u origin b/order-input     # → GitHub でプルリクエストを作
 
 | 箇所 | 内容 | 理由 |
 |---|---|---|
-| `common/config.php` | 値を環境変数から読む（無ければ XAMPP の初期値）。`DB_PORT` `MAIL_DRIVER` `RESEND_API_KEY` `SHOP_NAME` `OTP_MAX_TRIES` `PRODUCT_IMG_DIR` を追加 | Railway とローカルで同じファイルを使うため。パスワードを git に入れないため |
+| `common/config.php` | 値を環境変数から読む（無ければ XAMPP の初期値）。`DB_PORT` `MAIL_DRIVER` `RESEND_API_KEY` `MAIL_REDIRECT_TO` `SHOP_NAME` `OTP_MAX_TRIES` `PRODUCT_IMG_DIR` を追加 | Railway とローカルで同じファイルを使うため。パスワードを git に入れないため |
 | `common/db.php` | 接続時に `SET time_zone = '+09:00'` | Railway の MySQL は UTC のため |
 | `common/mail.php` | `MAIL_DRIVER` で log / smtp / resend を切替 | Railway Hobby は SMTP 不可のため |
 | `common/pdf.php` | `lib/` が無いときは印刷用 HTML を表示 | composer 無しでもローカル開発できるように |

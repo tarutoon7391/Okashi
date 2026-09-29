@@ -41,6 +41,9 @@ $isPublic  = true;
 require_once __DIR__ . '/common/header.php';
 ?>
 <p><?= h($masked) ?> にワンタイムコードを送信しました。<?= OTP_EXPIRE_MIN ?> 分以内に入力してください。</p>
+<?php if (MAIL_REDIRECT_TO !== ''): ?>
+  <p class="note">（デモ設定のため、メールはすべて管理用のアドレスに届きます）</p>
+<?php endif; ?>
 <?php if (isset($_SESSION['otp']['dev_code'])): ?>
   <p class="dev-note">開発モード（MAIL_DRIVER=log）のためメールは送っていません。コード：<strong><?= h($_SESSION['otp']['dev_code']) ?></strong></p>
 <?php endif; ?>

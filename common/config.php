@@ -30,7 +30,11 @@ define('SHOP_NAME', env('SHOP_NAME', 'お土産処 みやげや'));   // 発注�
 //               = smtp   ：Gmail などの SMTP で送る（Railway は Pro プラン以外 SMTP がブロックされる）
 //               = resend ：Resend の HTTP API で送る（Railway の無料/Hobby プランで送るならこれ）
 define('MAIL_DRIVER', env('MAIL_DRIVER', 'log'));
-define('MAIL_FROM', env('MAIL_FROM', 'xxxx@gmail.com'));
+// Resend で独自ドメインを登録していないときは onboarding@resend.dev からしか送れない
+define('MAIL_FROM', env('MAIL_FROM', MAIL_DRIVER === 'resend' ? 'onboarding@resend.dev' : 'xxxx@gmail.com'));
+// 設定すると、すべてのメールをこのアドレスに送る（本来の宛先は件名に付ける）。
+// Resend の無料テスト送信は「Resend に登録した自分のアドレス」にしか届かないため、デモではここに総括のアドレスを入れる
+define('MAIL_REDIRECT_TO', env('MAIL_REDIRECT_TO', ''));
 define('MAIL_FROM_NAME', env('MAIL_FROM_NAME', APP_NAME));
 define('SMTP_HOST', env('SMTP_HOST', 'smtp.gmail.com'));
 define('SMTP_PORT', (int)env('SMTP_PORT', 587));

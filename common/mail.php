@@ -17,6 +17,10 @@ if (is_file(__DIR__ . '/../lib/autoload.php')) {
 // 送信できたら true。失敗は false（理由はログへ）
 function sendMail(string $to, string $subject, string $body, array $attachments = []): bool
 {
+    if (MAIL_REDIRECT_TO !== '') {
+        $subject = "[本来の宛先:{$to}] " . $subject;
+        $to = MAIL_REDIRECT_TO;
+    }
     try {
         if (MAIL_DRIVER === 'smtp') {
             return sendMailBySmtp($to, $subject, $body, $attachments);
