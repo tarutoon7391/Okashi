@@ -4,6 +4,8 @@
 // ・パスワード（初期パスワード含む）と発注承認可否は、発注承認可の操作者だけが設定できる（質問No.5）
 //   承認不可の人が開いたときは欄を出さず、POST されても無視する。新規登録も承認可の人だけ
 // ・パスワードは新規時のみ必須。編集時は空欄なら変更しない
+// ・承認不可の操作者は「自分自身」の操作者名・メールアドレスだけ編集できる。他人の編集・新規登録は不可
+// ・GET パラメータは ?operator_code=XXX（01 §4.1）。旧 ?code=XXX も互換のため受け付ける
 require_once __DIR__ . '/../common/auth.php';
 require_once __DIR__ . '/../common/db.php';
 require_once __DIR__ . '/../common/functions.php';
@@ -12,13 +14,22 @@ $pdo = getDb();
 $errors = [];
 
 $me = currentOperator();
+// 権限はセッションではなく DB の最新値で判定する（ログイン中に権限を外された場合に備える）
+$st = $pdo->prepare('SELECT can_approve_order FROM m_operator WHERE operator_code = :code AND is_deleted = 0');
+$st->execute([':code' => $me['operator_code']]);
+$me['can_approve_order'] = (int)$st->fetchColumn();
 $isApprover = $me['can_approve_order'] === 1;
-$editCode = is_string($_GET['code'] ?? null) ? $_GET['code'] : '';
+$editCode = $_GET['operator_code'] ?? ($_GET['code'] ?? null);
+$editCode = is_string($editCode) ? $editCode : '';
 $isEdit = $editCode !== '';
 $operator = ['operator_code' => '', 'operator_name' => '', 'email' => '', 'can_approve_order' => 0];
 
 if (!$isEdit && !$isApprover) {
     setFlash('error', '操作者の新規登録は発注承認可の操作者だけが行えます');
+    redirect('/master/operator_list.php');
+}
+if ($isEdit && !$isApprover && $editCode !== $me['operator_code']) {
+    setFlash('error', '他の操作者の編集は発注承認可の操作者だけが行えます');
     redirect('/master/operator_list.php');
 }
 if ($isEdit) {
@@ -119,7 +130,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             setFlash('success', '操作者「' . $o['operator_name'] . '」を' . ($isEdit ? '更新' : '登録') . 'しました');
             redirect('/master/operator_list.php');
         } catch (Throwable $e) {
-            $errors[] = '保存に失敗しました：' . $e->getMessage();
+            error_log('operator_edit: ' . $e->getMessage());
+            $errors[] = '保存に失敗しました。時間をおいてもう一度お試しください';
         }
     }
     setFlash('error', implode("\n", $errors));

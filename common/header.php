@@ -12,7 +12,7 @@ $isPublic = $isPublic ?? false;
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= h($pageTitle) ?> | <?= h(APP_NAME) ?></title>
-<link rel="stylesheet" href="/css/style.css?v=1">
+<link rel="stylesheet" href="/css/style.css?v=2">
 </head>
 <body>
 <header class="app-header">
@@ -30,6 +30,9 @@ $isPublic = $isPublic ?? false;
 </header>
 <?php if ($flash): ?>
   <div class="flash flash-<?= h($flash['type']) ?>"><?= nl2br(h($flash['msg'])) ?></div>
+<?php endif; ?>
+<?php if ($isPublic && function_exists('isInsecureMailInProduction') && isInsecureMailInProduction()): ?>
+  <div class="flash flash-error prod-warning">メール未設定のためワンタイムコードを画面表示しています（本番では Resend を設定してください）</div>
 <?php endif; ?>
 <main class="container">
 <h1><?= h($pageTitle) ?></h1>

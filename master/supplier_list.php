@@ -45,7 +45,7 @@ require_once __DIR__ . '/../common/header.php';
       <td class="num"><?= h($s['product_cnt']) ?></td>
       <td><?= h($s['memo']) ?></td>
       <td class="nowrap">
-        <a href="/master/supplier_edit.php?code=<?= h(rawurlencode($s['supplier_code'])) ?>" class="btn btn-small">編集</a>
+        <a href="/master/supplier_edit.php?supplier_code=<?= h(rawurlencode($s['supplier_code'])) ?>" class="btn btn-small">編集</a>
         <form method="post" action="/master/supplier_delete.php" class="inline-form" data-confirm="<?= h($s['supplier_name']) ?> を削除します。よろしいですか？">
           <input type="hidden" name="supplier_code" value="<?= h($s['supplier_code']) ?>">
           <button type="submit" class="btn btn-small btn-danger">削除</button>

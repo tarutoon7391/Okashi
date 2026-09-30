@@ -27,6 +27,7 @@ function confirmOrder(int $orderNo): void
         if ((int)$row['is_confirmed'] === 1) {
             throw new RuntimeException('既に確定済みです');
         }
+        checkOrderCancelQty($orderNo);
         $st = $pdo->prepare('UPDATE t_order SET is_confirmed = 1, confirmed_at = NOW(), confirmed_by = :by,
                              updated_by = :by2 WHERE order_no = :no');
         $st->execute([':by' => $op['operator_code'], ':by2' => $op['operator_code'], ':no' => $orderNo]);
@@ -34,6 +35,55 @@ function confirmOrder(int $orderNo): void
     } catch (Throwable $e) {
         $pdo->rollBack();
         throw $e;
+    }
+}
+
+// 内部関数：confirmOrder のトランザクションの中で、取消（マイナス）明細が取消元の残数を超えていないか確かめる
+// 残数 = 発注数 ＋ 確定済みの取消合計（マイナス）− 納品数合計（is_return=0。未確定の納品も含める）
+// 取消元の明細行を FOR UPDATE でロックして、同じ取消元への取消を同時に確定できないようにする
+function checkOrderCancelQty(int $orderNo): void
+{
+    $pdo = getDb();
+    $st  = $pdo->prepare('SELECT COUNT(*) FROM t_order_detail
+                           WHERE order_no = :no AND order_qty < 0 AND ref_order_no IS NULL');
+    $st->execute([':no' => $orderNo]);
+    if ((int)$st->fetchColumn() > 0) {
+        throw new RuntimeException('取消元が指定されていないマイナス数量の明細があります');
+    }
+    $st  = $pdo->prepare('SELECT ref_order_no, ref_line_no, SUM(order_qty) AS cancel_qty
+                            FROM t_order_detail
+                           WHERE order_no = :no AND order_qty < 0 AND ref_order_no IS NOT NULL
+                           GROUP BY ref_order_no, ref_line_no');
+    $st->execute([':no' => $orderNo]);
+    $cancels = $st->fetchAll();
+
+    $lockRef = $pdo->prepare('SELECT d.order_qty, o.is_confirmed
+                                FROM t_order_detail d JOIN t_order o ON o.order_no = d.order_no
+                               WHERE d.order_no = :no AND d.line_no = :line FOR UPDATE');
+    $sumCancel = $pdo->prepare('SELECT COALESCE(SUM(x.order_qty), 0)
+                                  FROM t_order_detail x
+                                  JOIN t_order xo ON xo.order_no = x.order_no AND xo.is_confirmed = 1
+                                 WHERE x.ref_order_no = :no AND x.ref_line_no = :line');
+    $sumDelivered = $pdo->prepare('SELECT COALESCE(SUM(dd.delivery_qty), 0)
+                                     FROM t_delivery_detail dd
+                                     JOIN t_delivery dh ON dh.delivery_no = dd.delivery_no AND dh.is_return = 0
+                                    WHERE dd.order_no = :no AND dd.order_line_no = :line');
+    foreach ($cancels as $c) {
+        $key = [':no' => (int)$c['ref_order_no'], ':line' => (int)$c['ref_line_no']];
+        $label = "取消元 No.{$c['ref_order_no']}-{$c['ref_line_no']}";
+        $lockRef->execute($key);
+        $ref = $lockRef->fetch();
+        if ($ref === false || (int)$ref['is_confirmed'] !== 1 || (int)$ref['order_qty'] <= 0) {
+            throw new RuntimeException("{$label} の発注明細が見つからないか、取消できない明細です");
+        }
+        $sumCancel->execute($key);
+        $sumDelivered->execute($key);
+        $remain = (int)$ref['order_qty'] + (int)$sumCancel->fetchColumn() - (int)$sumDelivered->fetchColumn();
+        $cancelQty = -(int)$c['cancel_qty'];
+        if ($cancelQty > $remain) {
+            throw new RuntimeException("{$label} の取消数（{$cancelQty}）が残数（{$remain}）を超えています。"
+                . 'ほかの取消や納品が先に登録された可能性があります。この伝票を削除して入力し直してください');
+        }
     }
 }
 

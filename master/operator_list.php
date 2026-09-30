@@ -11,16 +11,18 @@ $operators = $pdo->query(
        FROM m_operator WHERE is_deleted = 0 ORDER BY operator_code'
 )->fetchAll();
 $me = currentOperator();
+// 承認不可の操作者は自分の行の「編集」だけ出す（他人の編集・削除ボタンは出さない。サーバ側でも弾く）
+$isApprover = $me['can_approve_order'] === 1;
 
 $pageTitle = '操作者一覧';
 require_once __DIR__ . '/../common/header.php';
 ?>
-<?php if ($me['can_approve_order'] === 1): ?>
+<?php if ($isApprover): ?>
 <div class="btn-area">
   <a href="/master/operator_edit.php" class="btn btn-primary">新規登録</a>
 </div>
 <?php else: ?>
-<p class="note">操作者の新規登録とパスワード・権限の設定は、発注承認可の操作者だけが行えます（質問No.5）。</p>
+<p class="note">操作者の新規登録・削除、他の操作者の編集、パスワード・権限の設定は、発注承認可の操作者だけが行えます（質問No.5）。自分の操作者名・メールアドレスは変更できます。</p>
 <?php endif; ?>
 <table class="data-table">
   <thead>
@@ -35,8 +37,10 @@ require_once __DIR__ . '/../common/header.php';
       <td><?= (int)$o['can_approve_order'] === 1 ? '<span class="status-confirmed">可</span>' : '不可' ?></td>
       <td><?= h($o['updated_at']) ?></td>
       <td class="nowrap">
-        <a href="/master/operator_edit.php?code=<?= h(rawurlencode($o['operator_code'])) ?>" class="btn btn-small">編集</a>
-        <?php if ($o['operator_code'] !== $me['operator_code']): ?>
+        <?php if ($isApprover || $o['operator_code'] === $me['operator_code']): ?>
+        <a href="/master/operator_edit.php?operator_code=<?= h(rawurlencode($o['operator_code'])) ?>" class="btn btn-small">編集</a>
+        <?php endif; ?>
+        <?php if ($isApprover && $o['operator_code'] !== $me['operator_code']): ?>
         <form method="post" action="/master/operator_delete.php" class="inline-form" data-confirm="<?= h($o['operator_name']) ?> を削除します。よろしいですか？">
           <input type="hidden" name="operator_code" value="<?= h($o['operator_code']) ?>">
           <button type="submit" class="btn btn-small btn-danger">削除</button>

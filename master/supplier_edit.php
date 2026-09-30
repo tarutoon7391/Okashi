@@ -1,6 +1,6 @@
 <?php
 // SC-73 卸業者登録・編集（F-71）担当A
-// ?code=XXX があれば編集モード、無ければ新規
+// ?supplier_code=XXX があれば編集モード、無ければ新規（旧 ?code=XXX も互換のため受け付ける）
 require_once __DIR__ . '/../common/auth.php';
 require_once __DIR__ . '/../common/db.php';
 require_once __DIR__ . '/../common/functions.php';
@@ -9,7 +9,8 @@ $pdo = getDb();
 $errors = [];
 
 $fields = ['supplier_code', 'supplier_name', 'office_address', 'order_email', 'contact_name', 'memo'];
-$editCode = is_string($_GET['code'] ?? null) ? $_GET['code'] : '';
+$editCode = $_GET['supplier_code'] ?? ($_GET['code'] ?? null);
+$editCode = is_string($editCode) ? $editCode : '';
 $isEdit = $editCode !== '';
 $supplier = array_fill_keys($fields, '');
 
@@ -33,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $supplier['supplier_code'] = $editCode;
     }
     $s = $supplier;
-    if (!preg_match('/\A[A-Za-z0-9_-]{1,10}\z/', $s['supplier_code'])) {
+    if (!preg_match('/\A[A-Za-z0-9]{1,10}\z/', $s['supplier_code'])) {
         $errors[] = '卸業者コードは英数字10文字以内で入力してください';
     } elseif (!$isEdit) {
         $st = $pdo->prepare('SELECT COUNT(*) FROM m_supplier WHERE supplier_code = :code');
@@ -85,7 +86,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             setFlash('success', '卸業者「' . $s['supplier_name'] . '」を' . ($isEdit ? '更新' : '登録') . 'しました');
             redirect('/master/supplier_list.php');
         } catch (Throwable $e) {
-            $errors[] = '保存に失敗しました：' . $e->getMessage();
+            error_log('supplier_edit: ' . $e->getMessage());
+            $errors[] = '保存に失敗しました。時間をおいてもう一度お試しください';
         }
     }
     setFlash('error', implode("\n", $errors));
@@ -100,7 +102,7 @@ require_once __DIR__ . '/../common/header.php';
     <?php if ($isEdit): ?>
       <div><strong><?= h($supplier['supplier_code']) ?></strong>（変更できません）</div>
     <?php else: ?>
-      <input type="text" id="supplierCode" name="supplier_code" value="<?= h($supplier['supplier_code']) ?>" maxlength="10" pattern="[A-Za-z0-9_\-]+" required>
+      <input type="text" id="supplierCode" name="supplier_code" value="<?= h($supplier['supplier_code']) ?>" maxlength="10" pattern="[A-Za-z0-9]+" title="英数字10文字以内" required>
     <?php endif; ?>
     <label for="supplierName">卸業者名 <span class="req">必須</span></label>
     <input type="text" id="supplierName" name="supplier_name" value="<?= h($supplier['supplier_name']) ?>" maxlength="100" required>

@@ -75,6 +75,11 @@ h2 { font-size: 16px; margin: 20px 0 8px; border-left: 4px solid #2b4c7e; paddin
 .note { font-size: 13px; color: #555; }
 .dev-note { font-size: 14px; background: #fffbe6; border: 1px dashed #d9b400; padding: 6px 10px; }
 .error-text { color: #c53030; }
+.text-muted { color: #888; }
+/* 入力行のエラー（発注入力で商品コードが見つからない行など） */
+.row-error td, tr.row-error { background: #fde8e8; }
+/* 本番なのにメール未設定（MAIL_DRIVER=log）の警告。ログイン画面・コード入力画面に出す */
+.prod-warning { font-weight: bold; border: 2px solid #c53030; }
 .req { font-size: 11px; color: #fff; background: #c53030; border-radius: 3px; padding: 0 4px; }
 .radio { margin-right: 12px; white-space: nowrap; }
 

@@ -13,8 +13,10 @@ if (is_file(__DIR__ . '/../lib/autoload.php')) {
     require_once __DIR__ . '/../lib/autoload.php';
 }
 
-// $attachments = [['name' => 'a.pdf', 'content' => (バイナリ文字列), 'type' => 'application/pdf'], ...]
+// $attachments = [['name' => 'a.pdf', 'data' => (バイナリ文字列), 'type' => 'application/pdf'], ...]
+//   中身のキーは 06-0 の 'data'。以前の 'content' も受け付ける（attachmentData() で吸収）
 // 送信できたら true。失敗は false（理由はログへ）
+// MAIL_DRIVER=log のときは実際には送らないが true を返す（送ったかどうかは isMailActuallySent() で判定）
 function sendMail(string $to, string $subject, string $body, array $attachments = []): bool
 {
     if (MAIL_REDIRECT_TO !== '') {
@@ -36,6 +38,25 @@ function sendMail(string $to, string $subject, string $body, array $attachments 
         error_log('[mail] 送信失敗：' . $e->getMessage());
         return false;
     }
+}
+
+// 実際にメールが外へ出るドライバか（log は送らない）
+function isMailActuallySent(): bool
+{
+    return MAIL_DRIVER === 'smtp' || MAIL_DRIVER === 'resend';
+}
+
+// 本番（Railway）なのに MAIL_DRIVER=log のまま＝ワンタイムコードを画面に出している状態か
+// ログイン画面・コード入力画面で赤い警告を出すのに使う
+function isInsecureMailInProduction(): bool
+{
+    return MAIL_DRIVER === 'log' && (string)getenv('RAILWAY_ENVIRONMENT') !== '';
+}
+
+// 添付ファイルの中身（'data' 優先、無ければ 'content'）
+function attachmentData(array $a): string
+{
+    return (string)($a['data'] ?? $a['content'] ?? '');
 }
 
 function sendMailBySmtp(string $to, string $subject, string $body, array $attachments): bool
@@ -61,7 +82,7 @@ function sendMailBySmtp(string $to, string $subject, string $body, array $attach
     $mail->Subject = $subject;
     $mail->Body    = $body;
     foreach ($attachments as $a) {
-        $mail->addStringAttachment($a['content'], $a['name'], 'base64', $a['type'] ?? 'application/octet-stream');
+        $mail->addStringAttachment(attachmentData($a), $a['name'], 'base64', $a['type'] ?? 'application/octet-stream');
     }
     return $mail->send();
 }
@@ -75,7 +96,7 @@ function sendMailByResend(string $to, string $subject, string $body, array $atta
         'text'    => $body,
     ];
     foreach ($attachments as $a) {
-        $payload['attachments'][] = ['filename' => $a['name'], 'content' => base64_encode($a['content'])];
+        $payload['attachments'][] = ['filename' => $a['name'], 'content' => base64_encode(attachmentData($a))];
     }
     $ch = curl_init('https://api.resend.com/emails');
     curl_setopt_array($ch, [
@@ -106,11 +127,13 @@ function sendOtpMail(string $to, string $otp): bool
           . '有効期限は ' . OTP_EXPIRE_MIN . " 分です。\n"
           . "心当たりが無い場合はこのメールを破棄してください。\n\n"
           . APP_NAME;
-    return sendMail($to, '【' . APP_NAME . '】ワンタイムコード', $body);
+    return sendMail($to, '【お土産発注管理】ログイン確認コード', $body);   // 件名は 06-0 どおり
 }
 
 // 確定した発注伝票の発注書PDFを卸業者へ送る（質問No.6）
 // 成功したら t_order.mailed_at を更新して true。アドレス未登録・送信失敗は false（確定は取り消さない）
+// MAIL_DRIVER=log のときは実際には送っていないので true は返すが mailed_at は更新しない
+// （発注書画面が「送信済」と誤表示しないため）
 function sendOrderMail(int $orderNo): bool
 {
     $slip = getOrderSlip($orderNo);
@@ -124,7 +147,7 @@ function sendOrderMail(int $orderNo): bool
     $pdf  = outputPdf('発注書', $html, "order_{$orderNo}.pdf", 'S');
     $attachments = [];
     if ($pdf !== null) {
-        $attachments[] = ['name' => "発注書_No{$orderNo}.pdf", 'content' => $pdf, 'type' => 'application/pdf'];
+        $attachments[] = ['name' => "発注書_No{$orderNo}.pdf", 'data' => $pdf, 'type' => 'application/pdf'];
     }
     $body = $slip['supplier_name'] . " 御中\n\n"
           . "いつもお世話になっております。" . SHOP_NAME . " です。\n"
@@ -135,6 +158,9 @@ function sendOrderMail(int $orderNo): bool
           . SHOP_NAME;
     if (!sendMail($slip['order_email'], '【発注書】' . SHOP_NAME . ' 発注伝票No.' . $orderNo, $body, $attachments)) {
         return false;
+    }
+    if (!isMailActuallySent()) {
+        return true;
     }
     // 確定済み伝票だが、送信日時の記録だけは設計どおり更新する（05 §8）
     $st = getDb()->prepare('UPDATE t_order SET mailed_at = NOW() WHERE order_no = :no');

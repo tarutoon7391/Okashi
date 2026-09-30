@@ -31,10 +31,13 @@ $rows = $st->fetchAll();
 $chartTotal = array_sum(array_map(fn($r) => max(0, (int)$r['net_amount']), $rows));
 $colors = ['#2b6cb0', '#dd6b20', '#38a169', '#d53f8c', '#805ad5', '#d69e2e', '#319795', '#718096'];
 $chartData = [];
-foreach ($rows as $i => &$r) {
-    $r['color'] = $colors[$i % count($colors)];
+// 色はグラフに出す（純額プラスの）卸業者にだけ順に割り当てる。純額0以下は凡例の色も出さない
+$colorIndex = 0;
+foreach ($rows as &$r) {
+    $r['color'] = null;
     $r['ratio'] = $chartTotal > 0 && (int)$r['net_amount'] > 0 ? round((int)$r['net_amount'] / $chartTotal * 100, 1) : null;
     if ((int)$r['net_amount'] > 0) {
+        $r['color'] = $colors[$colorIndex++ % count($colors)];
         $chartData[] = ['label' => $r['supplier_name'], 'value' => (int)$r['net_amount'], 'color' => $r['color']];
     }
 }
@@ -54,7 +57,7 @@ require_once __DIR__ . '/../common/header.php';
       <?php if (!$rows): ?><tr><td colspan="7">該当するデータがありません</td></tr><?php endif; ?>
       <?php foreach ($rows as $r): ?>
       <tr>
-        <td><span class="legend-color" style="background:<?= h($r['color']) ?>"></span></td>
+        <td><?php if ($r['color'] !== null): ?><span class="legend-color" style="background:<?= h($r['color']) ?>"></span><?php endif; ?></td>
         <td><?= h($r['supplier_code']) ?></td>
         <td><?= h($r['supplier_name']) ?></td>
         <td class="num"><?= h(formatYen($r['delivery_amount'])) ?></td>

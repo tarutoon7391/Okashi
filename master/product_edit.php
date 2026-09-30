@@ -1,6 +1,6 @@
 <?php
 // SC-71 商品登録・編集（F-70）担当A
-// ?code=XXX があれば編集モード、無ければ新規。新規登録と同時に在庫（t_stock）を stock_qty=0 で作る
+// ?product_code=XXX があれば編集モード、無ければ新規（旧 ?code=XXX も互換のため受け付ける）。新規登録と同時に在庫（t_stock）を stock_qty=0 で作る
 // 入数違いは別の商品コードで登録する（質問No.1）。保存区分・賞味期限日数（質問No.12）
 require_once __DIR__ . '/../common/auth.php';
 require_once __DIR__ . '/../common/db.php';
@@ -13,8 +13,26 @@ $errors = [];
 
 $fields = ['product_code', 'product_name', 'product_kana', 'spec', 'pack_qty', 'unit', 'jan_code', 'list_price',
            'maker_name', 'supplier_code', 'contract_price', 'memo', 'storage_type', 'shelf_life_days'];
-$editCode = is_string($_GET['code'] ?? null) ? $_GET['code'] : '';
+$editCode = $_GET['product_code'] ?? ($_GET['code'] ?? null);
+$editCode = is_string($editCode) ? $editCode : '';
 $isEdit = $editCode !== '';
+
+// JANコード（13桁）のチェックデジットが正しいか。奇数桁×1＋偶数桁×3 の合計から求める
+function isValidJanCheckDigit(string $jan): bool
+{
+    $sum = 0;
+    for ($i = 0; $i < 12; $i++) {
+        $sum += (int)$jan[$i] * ($i % 2 === 0 ? 1 : 3);
+    }
+    return (10 - $sum % 10) % 10 === (int)$jan[12];
+}
+
+// 写真のキャッシュ対策：ファイルの更新時刻を ?v= に付ける（差し替え後に古い画像が出ないように）
+function photoVersion(string $photoPath): int
+{
+    $file = PRODUCT_IMG_DIR . '/' . $photoPath;
+    return is_file($file) ? (int)filemtime($file) : 0;
+}
 $product = array_fill_keys($fields, '') + ['photo_path' => null];
 $product['pack_qty'] = 1;
 $product['unit'] = '個';
@@ -33,6 +51,8 @@ if ($isEdit) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // 1. 入力値の取得・バリデーション
+    $oldJan   = (string)($product['jan_code'] ?? '');     // 登録済みのJAN（変更していなければチェックデジットは見ない）
+    $oldPhoto = $product['photo_path'] ?? null;           // 差し替え・削除時に古いファイルを消すため
     foreach ($fields as $f) {
         $product[$f] = postStr($f);
     }
@@ -40,7 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $product['product_code'] = $editCode;   // コードは変更しない
     }
     $p = $product;
-    if (!preg_match('/\A[A-Za-z0-9_-]{1,13}\z/', $p['product_code'])) {
+    if (!preg_match('/\A[A-Za-z0-9]{1,13}\z/', $p['product_code'])) {
         $errors[] = '商品コードは英数字13文字以内で入力してください';
     } elseif (!$isEdit) {
         $st = $pdo->prepare('SELECT COUNT(*) FROM m_product WHERE product_code = :code');   // 削除済みも含めて重複チェック
@@ -52,8 +72,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($p['product_name'] === '' || mb_strlen($p['product_name']) > 100) {
         $errors[] = '商品名を100文字以内で入力してください';
     }
-    if (!preg_match('/\A[ァ-ヴー・　 ０-９0-9Ａ-Ｚａ-ｚ]{1,100}\z/u', $p['product_kana'])) {
-        $errors[] = '商品名カナは全角カタカナで入力してください';
+    // 全角カタカナのみ（ァ〜ヶ：ヴ・ヵ・ヶを含む、長音ー、中黒・、全角スペース）。数字・英字・ひらがなは不可
+    if (!preg_match('/\A[ァ-ヶー・　]{1,100}\z/u', $p['product_kana']) || trim($p['product_kana'], '　') === '') {
+        $errors[] = '商品名カナは全角カタカナのみで入力してください（数字・英字・ひらがなは使えません）';
     }
     if (mb_strlen($p['spec']) > 50) {
         $errors[] = '規格は50文字以内で入力してください';
@@ -64,8 +85,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($p['unit'] === '' || mb_strlen($p['unit']) > 10) {
         $errors[] = '単位を10文字以内で入力してください';
     }
-    if ($p['jan_code'] !== '' && !preg_match('/\A(\d{8}|\d{13})\z/', $p['jan_code'])) {
-        $errors[] = 'JANコードは8桁または13桁の数字で入力してください';
+    if ($p['jan_code'] !== '') {
+        if (!preg_match('/\A\d{13}\z/', $p['jan_code'])) {
+            $errors[] = 'JANコードは13桁の数字で入力してください（未入力も可）';
+        } elseif ($p['jan_code'] !== $oldJan && !isValidJanCheckDigit($p['jan_code'])) {
+            // 初期データ（sql/02）のJANはダミー値なので、変更していないときは通す
+            $errors[] = 'JANコードのチェックデジット（13桁目）が正しくありません。バーコードの数字を確認してください';
+        }
     }
     if (toIntOrNull($p['list_price']) === null || (int)$p['list_price'] < 0) {
         $errors[] = '定価は0以上の整数（円）で入力してください';
@@ -87,7 +113,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // 写真（任意）：img/product/ に「商品コード.拡張子」で保存し、ファイル名だけDBに入れる
-    $photoPath = $product['photo_path'] ?? null;
+    $photoPath = $oldPhoto;
+    $uploaded = false;
     $upload = $_FILES['photo'] ?? null;
     if ($upload && $upload['error'] !== UPLOAD_ERR_NO_FILE) {
         $ext = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif', 'image/webp' => 'webp'];
@@ -99,12 +126,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!is_dir(PRODUCT_IMG_DIR)) {
                 mkdir(PRODUCT_IMG_DIR, 0775, true);
             }
-            if (!move_uploaded_file($upload['tmp_name'], PRODUCT_IMG_DIR . '/' . $photoPath)) {
+            if (move_uploaded_file($upload['tmp_name'], PRODUCT_IMG_DIR . '/' . $photoPath)) {
+                $uploaded = true;
+            } else {
+                $photoPath = $oldPhoto;
                 $errors[] = '写真を保存できませんでした';
             }
         }
     }
-    if (postStr('delete_photo') === '1') {
+    // 「写真を外す」は新しい写真を選ばなかったときだけ効かせる（選んだときは差し替え）
+    if (postStr('delete_photo') === '1' && !$uploaded) {
         $photoPath = null;
     }
 
@@ -152,11 +183,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 addStock($p['product_code'], 0, $by);   // 在庫行を stock_qty=0 で作る（無いと納品確定で困る）
             }
             $pdo->commit();
+            // 写真を外した・拡張子違いで差し替えたときは、古いファイルを消す（同じファイル名なら上書き済み）
+            if ($oldPhoto !== null && $oldPhoto !== '' && $oldPhoto !== $photoPath) {
+                $oldFile = PRODUCT_IMG_DIR . '/' . basename($oldPhoto);
+                if (is_file($oldFile) && !@unlink($oldFile)) {
+                    error_log('product_edit: 古い写真を削除できませんでした ' . $oldFile);
+                }
+            }
             setFlash('success', '商品「' . $p['product_name'] . '」を' . ($isEdit ? '更新' : '登録') . 'しました');
             redirect('/master/product_list.php');
         } catch (Throwable $e) {
-            $pdo->rollBack();
-            $errors[] = '保存に失敗しました：' . $e->getMessage();
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            error_log('product_edit: ' . $e->getMessage());
+            $errors[] = '保存に失敗しました。時間をおいてもう一度お試しください';
         }
     }
     setFlash('error', implode("\n", $errors));
@@ -172,7 +213,7 @@ require_once __DIR__ . '/../common/header.php';
     <?php if ($isEdit): ?>
       <div><strong><?= h($product['product_code']) ?></strong>（変更できません）</div>
     <?php else: ?>
-      <input type="text" id="productCode" name="product_code" value="<?= h($product['product_code']) ?>" maxlength="13" pattern="[A-Za-z0-9_\-]+" required>
+      <input type="text" id="productCode" name="product_code" value="<?= h($product['product_code']) ?>" maxlength="13" pattern="[A-Za-z0-9]+" title="英数字13文字以内" required>
     <?php endif; ?>
     <label for="productName">商品名 <span class="req">必須</span></label>
     <input type="text" id="productName" name="product_name" value="<?= h($product['product_name']) ?>" maxlength="100" required>
@@ -185,7 +226,7 @@ require_once __DIR__ . '/../common/header.php';
     <label for="unit">単位 <span class="req">必須</span></label>
     <input type="text" id="unit" name="unit" value="<?= h($product['unit']) ?>" maxlength="10" required>
     <label for="janCode">JANコード</label>
-    <input type="text" id="janCode" name="jan_code" value="<?= h($product['jan_code']) ?>" maxlength="13" inputmode="numeric">
+    <input type="text" id="janCode" name="jan_code" value="<?= h($product['jan_code']) ?>" maxlength="13" inputmode="numeric" pattern="\d{13}" title="13桁の数字" placeholder="13桁の数字（任意）">
     <label for="listPrice">定価（円） <span class="req">必須</span></label>
     <input type="number" id="listPrice" name="list_price" value="<?= h($product['list_price']) ?>" min="0" required>
     <label for="makerName">メーカー名</label>
@@ -210,7 +251,7 @@ require_once __DIR__ . '/../common/header.php';
     <label for="photo">写真</label>
     <div>
       <?php if (!empty($product['photo_path'])): ?>
-        <img src="/img/product/<?= h(rawurlencode($product['photo_path'])) ?>" alt="" class="thumb-large"><br>
+        <img src="/img/product/<?= h(rawurlencode($product['photo_path'])) ?>?v=<?= h(photoVersion($product['photo_path'])) ?>" alt="" class="thumb-large"><br>
         <label class="radio"><input type="checkbox" name="delete_photo" value="1"> 写真を外す</label><br>
       <?php endif; ?>
       <input type="file" id="photo" name="photo" accept="image/jpeg,image/png,image/gif,image/webp">

@@ -29,6 +29,13 @@ $st = $pdo->prepare($sql . ' ORDER BY p.product_kana, p.product_code');
 $st->execute($params);
 $products = $st->fetchAll();
 
+// 写真のキャッシュ対策：ファイルの更新時刻を ?v= に付ける（差し替え後に古い画像が出ないように）
+function photoVersion(string $photoPath): int
+{
+    $file = PRODUCT_IMG_DIR . '/' . $photoPath;
+    return is_file($file) ? (int)filemtime($file) : 0;
+}
+
 $pageTitle = '商品一覧';
 require_once __DIR__ . '/../common/header.php';
 ?>
@@ -49,13 +56,13 @@ require_once __DIR__ . '/../common/header.php';
 </div>
 <table class="data-table">
   <thead>
-    <tr><th>写真</th><th>商品コード</th><th>商品名（カナ）</th><th>規格</th><th>入数</th><th>定価</th><th>契約単価</th><th>契約卸</th><th>保存区分</th><th>在庫</th><th></th></tr>
+    <tr><th>写真</th><th>商品コード</th><th>商品名（カナ）</th><th>規格</th><th>入数</th><th>定価</th><th>契約単価</th><th>契約卸</th><th>保存区分</th><th>賞味期限日数</th><th>在庫</th><th></th></tr>
   </thead>
   <tbody>
-    <?php if (!$products): ?><tr><td colspan="11">該当する商品がありません</td></tr><?php endif; ?>
+    <?php if (!$products): ?><tr><td colspan="12">該当する商品がありません</td></tr><?php endif; ?>
     <?php foreach ($products as $p): ?>
     <tr class="<?= (int)$p['stock_qty'] <= 0 ? 'stock-warning' : '' ?>">
-      <td><?php if ($p['photo_path']): ?><img src="/img/product/<?= h(rawurlencode($p['photo_path'])) ?>" alt="" class="thumb"><?php endif; ?></td>
+      <td><?php if ($p['photo_path']): ?><img src="/img/product/<?= h(rawurlencode($p['photo_path'])) ?>?v=<?= h(photoVersion($p['photo_path'])) ?>" alt="" class="thumb"><?php endif; ?></td>
       <td><?= h($p['product_code']) ?></td>
       <td><?= h($p['product_name']) ?><br><small><?= h($p['product_kana']) ?></small></td>
       <td><?= h($p['spec']) ?></td>
@@ -64,9 +71,10 @@ require_once __DIR__ . '/../common/header.php';
       <td class="num"><?= h(formatYen($p['contract_price'])) ?></td>
       <td><?= h($p['supplier_name']) ?></td>
       <td><?= h(storageTypeName((int)$p['storage_type'])) ?><?= storageBadge($p['storage_type']) ?></td>
+      <td class="num"><?= $p['shelf_life_days'] === null ? '' : h($p['shelf_life_days'] . '日') ?></td>
       <td class="num"><?= h($p['stock_qty']) ?></td>
       <td class="nowrap">
-        <a href="/master/product_edit.php?code=<?= h(rawurlencode($p['product_code'])) ?>" class="btn btn-small">編集</a>
+        <a href="/master/product_edit.php?product_code=<?= h(rawurlencode($p['product_code'])) ?>" class="btn btn-small">編集</a>
         <form method="post" action="/master/product_delete.php" class="inline-form" data-confirm="<?= h($p['product_name'] . ' ' . $p['spec']) ?> を削除します。よろしいですか？">
           <input type="hidden" name="product_code" value="<?= h($p['product_code']) ?>">
           <button type="submit" class="btn btn-small btn-danger">削除</button>

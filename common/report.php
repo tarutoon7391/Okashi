@@ -4,16 +4,34 @@
 require_once __DIR__ . '/query.php';
 
 // GET パラメータから絞り込み条件を作る
+//   ・期間：両方未指定なら当月。片方だけ指定なら、もう片方は指定した日の月初／月末で補う
+//           （当月で補うと from > to になることがあるため）。from > to なら入れ替えて警告を出す
+//   ・状態：未指定は確定済みのみ（06-4 / 06-5「確定済み（is_confirmed=1）のみ」）。
+//           '0' = 未確定のみ、'all' = 未確定も含むすべて（確認用のオプション）
 function getReportFilter(): array
 {
     $from = $_GET['date_from'] ?? '';
     $to   = $_GET['date_to'] ?? '';
+    $from = is_string($from) && isValidDate($from) ? $from : '';
+    $to   = is_string($to) && isValidDate($to) ? $to : '';
+    if ($from === '' && $to === '') {
+        $from = date('Y-m-01');
+        $to   = date('Y-m-t');
+    } elseif ($to === '') {
+        $to = date('Y-m-t', strtotime($from));
+    } elseif ($from === '') {
+        $from = date('Y-m-01', strtotime($to));
+    } elseif ($from > $to) {
+        [$from, $to] = [$to, $from];
+        setFlash('warning', '期間の開始日が終了日より後だったため、入れ替えて表示しています');
+    }
+    $status = $_GET['status'] ?? '1';
     return [
-        'date_from'     => is_string($from) && isValidDate($from) ? $from : date('Y-m-01'),
-        'date_to'       => is_string($to) && isValidDate($to) ? $to : date('Y-m-t'),
+        'date_from'     => $from,
+        'date_to'       => $to,
         'supplier_code' => is_string($_GET['supplier_code'] ?? null) ? $_GET['supplier_code'] : '',
         'product_code'  => is_string($_GET['product_code'] ?? null) ? $_GET['product_code'] : '',
-        'status'        => in_array($_GET['status'] ?? '', ['0', '1'], true) ? $_GET['status'] : '',
+        'status'        => in_array($status, ['0', '1', 'all'], true) ? $status : '1',
     ];
 }
 
@@ -36,7 +54,8 @@ function buildReportWhere(array $filter, array $cols, array &$params): string
         $where[] = $cols['product'] . ' = :product_code';
         $params[':product_code'] = $filter['product_code'];
     }
-    if (isset($cols['status']) && $filter['status'] !== '') {
+    // 状態は 'all' のときだけ絞らない（既定は確定済みのみ）
+    if (isset($cols['status']) && $filter['status'] !== 'all') {
         $where[] = $cols['status'] . ' = :status';
         $params[':status'] = (int)$filter['status'];
     }
@@ -76,8 +95,8 @@ function renderReportFilter(array $filter, array $options = []): void
   <?php if ($options['status']): ?>
   <label>状態
     <select name="status">
-      <option value="">すべて</option>
-      <option value="1" <?= $filter['status'] === '1' ? 'selected' : '' ?>>確定済のみ</option>
+      <option value="1" <?= $filter['status'] === '1' ? 'selected' : '' ?>>確定済のみ（既定）</option>
+      <option value="all" <?= $filter['status'] === 'all' ? 'selected' : '' ?>>未確定も含めてすべて</option>
       <option value="0" <?= $filter['status'] === '0' ? 'selected' : '' ?>>未確定のみ</option>
     </select></label>
   <?php endif; ?>

@@ -2,12 +2,45 @@
 // SC-21 納品確定（F-21）担当C
 // 未確定の納品伝票（返品伝票を含む。返品は .row-return で色分け）を confirmDelivery() で確定
 // → 在庫が増える（返品・マイナス納品は減る）→ SC-22 未納品一覧表へ
+// 未確定の伝票は「削除」できる（入力間違いのやり直し用）。確定済みは削除しない（訂正はマイナス数量の新規伝票）
 require_once __DIR__ . '/../common/auth.php';
 require_once __DIR__ . '/../common/db.php';
 require_once __DIR__ . '/../common/functions.php';
+require_once __DIR__ . '/../common/query.php';
 require_once __DIR__ . '/../common/slip.php';
 requireLogin();
 $pdo = getDb();
+
+// 削除（未確定の伝票1枚。明細 → ヘッダの順に DELETE）
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && postStr('mode') === 'delete') {
+    $no = postInt('delivery_no');
+    try {
+        $pdo->beginTransaction();
+        $st = $pdo->prepare('SELECT is_confirmed, is_return FROM t_delivery WHERE delivery_no = :no FOR UPDATE');
+        $st->execute([':no' => $no]);
+        $row = $st->fetch();
+        if ($row === false || (int)$row['is_confirmed'] === 1) {
+            $pdo->rollBack();
+            setFlash('error', "伝票No.{$no}：削除できません（存在しないか、既に確定済みです）");
+            redirect('/delivery/delivery_confirm.php');
+        }
+        // 納品入力・返品入力の残数チェックと順番を合わせるため、対象の発注明細もロックする
+        $st = $pdo->prepare("SELECT CONCAT(order_no, '-', order_line_no) FROM t_delivery_detail WHERE delivery_no = :no");
+        $st->execute([':no' => $no]);
+        getOrderDetailsForUpdate($st->fetchAll(PDO::FETCH_COLUMN));
+        $pdo->prepare('DELETE FROM t_delivery_detail WHERE delivery_no = :no')->execute([':no' => $no]);
+        $pdo->prepare('DELETE FROM t_delivery WHERE delivery_no = :no AND is_confirmed = 0')->execute([':no' => $no]);
+        $pdo->commit();
+        setFlash('success', ((int)$row['is_return'] === 1 ? '返品伝票' : '納品伝票') . "No.{$no} を削除しました");
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        error_log('[delivery_confirm] 削除失敗 No.' . $no . '：' . $e->getMessage());
+        setFlash('error', "伝票No.{$no} の削除に失敗しました。もう一度やり直してください");
+    }
+    redirect('/delivery/delivery_confirm.php');
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $deliveryNos = array_values(array_unique(array_filter(array_map('intval', postArray('delivery_no')))));
@@ -22,7 +55,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             confirmDelivery($no);
             $confirmed[] = $no;
         } catch (Throwable $e) {
-            $messages[] = "伝票No.{$no}：" . $e->getMessage();
+            // 「既に確定済みです」など slip.php が投げる業務エラー（RuntimeException）だけ画面に出す
+            error_log('[delivery_confirm] 確定失敗 No.' . $no . '：' . $e->getMessage());
+            $messages[] = "伝票No.{$no}：" . ($e instanceof RuntimeException ? $e->getMessage() : '確定に失敗しました');
         }
     }
     if (!$confirmed) {
@@ -70,7 +105,7 @@ require_once __DIR__ . '/../common/header.php';
 <form method="post" data-confirm="チェックした納品伝票を確定し、在庫を更新します。確定後は変更できません。よろしいですか？">
   <table class="data-table">
     <thead>
-      <tr><th><input type="checkbox" class="js-check-all" title="すべて選択"></th><th>伝票No</th><th>区分</th><th>納品日</th><th>卸業者</th><th>明細</th><th>合計金額</th><th>状態</th></tr>
+      <tr><th><input type="checkbox" class="js-check-all" title="すべて選択"></th><th>伝票No</th><th>区分</th><th>納品日</th><th>卸業者</th><th>明細</th><th>合計金額</th><th>状態</th><th>削除</th></tr>
     </thead>
     <tbody>
       <?php foreach ($slips as $slip): ?>
@@ -95,6 +130,7 @@ require_once __DIR__ . '/../common/header.php';
         </td>
         <td class="num <?= minusClass($slip['total']) ?>"><?= h(formatYen($slip['total'])) ?></td>
         <?= statusCell(0) ?>
+        <td><button type="submit" form="deleteForm<?= h($slip['delivery_no']) ?>" class="btn btn-small btn-danger">削除</button></td>
       </tr>
       <?php endforeach; ?>
     </tbody>
@@ -104,6 +140,13 @@ require_once __DIR__ . '/../common/header.php';
     <a href="/menu.php" class="btn">メニューへ戻る</a>
   </div>
 </form>
+<?php // 削除ボタン用のフォーム（確定フォームの中に form は入れられないので外に置き、ボタンの form 属性で指す） ?>
+<?php foreach ($slips as $slip): ?>
+<form method="post" id="deleteForm<?= h($slip['delivery_no']) ?>" class="inline-form" data-confirm="<?= h(((int)$slip['is_return'] === 1 ? '返品伝票' : '納品伝票') . 'No.' . $slip['delivery_no']) ?> を削除します。よろしいですか？">
+  <input type="hidden" name="mode" value="delete">
+  <input type="hidden" name="delivery_no" value="<?= h($slip['delivery_no']) ?>">
+</form>
+<?php endforeach; ?>
 <?php endif; ?>
 <p><a href="/delivery/delivery_input.php">納品入力へ</a> ／ <a href="/return_goods/return_goods_input.php">返品伝票へ</a> ／ <a href="/delivery/undelivered_print.php">未納品一覧表へ</a></p>
 <?php require_once __DIR__ . '/../common/footer.php'; ?>

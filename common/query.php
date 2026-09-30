@@ -117,6 +117,12 @@ function buildOrderSheetHtml(array $slip, string $kind): string
 //        − 納品数合計（is_return=0 の納品伝票。未確定も含める＝二重に納品入力しないため）
 // を計算し、残数 > 0 の行だけ返す。取消明細自体と返品伝票は含めない（04 t_order_detail ※）
 // $filter：supplier_code / product_code / date_from / date_to（発注日） いずれも省略可
+//   include_delivered = true … 残数0以下でも納品済み数 > 0 の行を含める（SC-20 納品済みの訂正（マイナス）用）
+//   basis = 'confirmed' ……… 確定済みの納品だけで見た残数（confirmed_remain_qty）> 0 の行を返す（SC-22 用）
+// 返す列（従来の列はそのまま。confirmed_delivered_qty 以降は追加分）
+//   delivered_qty = 納品数合計（未確定を含む） / remain_qty = それを引いた残数
+//   confirmed_delivered_qty = 確定済みの納品数 / pending_delivered_qty = 未確定の納品数
+//   confirmed_remain_qty = 確定済みの納品だけを引いた残数 / returned_qty = 返品数合計（マイナス。未確定も含む）
 // ---------------------------------------------------------------
 function getUndeliveredList(array $filter = []): array
 {
@@ -138,12 +144,23 @@ function getUndeliveredList(array $filter = []): array
         $where[] = 'o.order_date <= :date_to';
         $params[':date_to'] = $filter['date_to'];
     }
+    if (($filter['basis'] ?? '') === 'confirmed') {
+        $having = 'confirmed_remain_qty > 0';
+    } elseif (!empty($filter['include_delivered'])) {
+        $having = 'remain_qty > 0 OR delivered_qty > 0';
+    } else {
+        $having = 'remain_qty > 0';
+    }
     $sql = 'SELECT d.order_no, d.line_no, o.order_date, o.supplier_code, s.supplier_name,
                    d.product_code, p.product_name, p.spec, p.pack_qty, p.unit, p.storage_type,
                    d.order_qty, d.contract_price, d.memo,
                    COALESCE(c.cancel_qty, 0)    AS cancel_qty,
                    COALESCE(v.delivered_qty, 0) AS delivered_qty,
-                   d.order_qty + COALESCE(c.cancel_qty, 0) - COALESCE(v.delivered_qty, 0) AS remain_qty
+                   d.order_qty + COALESCE(c.cancel_qty, 0) - COALESCE(v.delivered_qty, 0) AS remain_qty,
+                   COALESCE(v.confirmed_qty, 0) AS confirmed_delivered_qty,
+                   COALESCE(v.pending_qty, 0)   AS pending_delivered_qty,
+                   d.order_qty + COALESCE(c.cancel_qty, 0) - COALESCE(v.confirmed_qty, 0) AS confirmed_remain_qty,
+                   COALESCE(v.returned_qty, 0)  AS returned_qty
               FROM t_order_detail d
               JOIN t_order o    ON o.order_no = d.order_no
               JOIN m_supplier s ON s.supplier_code = o.supplier_code
@@ -156,33 +173,45 @@ function getUndeliveredList(array $filter = []): array
                      GROUP BY x.ref_order_no, x.ref_line_no
                    ) c ON c.ref_order_no = d.order_no AND c.ref_line_no = d.line_no
               LEFT JOIN (
-                    SELECT dd.order_no, dd.order_line_no, SUM(dd.delivery_qty) AS delivered_qty
+                    SELECT dd.order_no, dd.order_line_no,
+                           SUM(CASE WHEN dh.is_return = 0 THEN dd.delivery_qty ELSE 0 END)                         AS delivered_qty,
+                           SUM(CASE WHEN dh.is_return = 0 AND dh.is_confirmed = 1 THEN dd.delivery_qty ELSE 0 END) AS confirmed_qty,
+                           SUM(CASE WHEN dh.is_return = 0 AND dh.is_confirmed = 0 THEN dd.delivery_qty ELSE 0 END) AS pending_qty,
+                           SUM(CASE WHEN dh.is_return = 1 THEN dd.delivery_qty ELSE 0 END)                         AS returned_qty
                       FROM t_delivery_detail dd
-                      JOIN t_delivery dh ON dh.delivery_no = dd.delivery_no AND dh.is_return = 0
+                      JOIN t_delivery dh ON dh.delivery_no = dd.delivery_no
                      GROUP BY dd.order_no, dd.order_line_no
                    ) v ON v.order_no = d.order_no AND v.order_line_no = d.line_no
              WHERE ' . implode(' AND ', $where) . '
-            HAVING remain_qty > 0
+            HAVING ' . $having . '
              ORDER BY o.supplier_code, o.order_date, d.order_no, d.line_no';
     $st = getDb()->prepare($sql);
     $st->execute($params);
     return $st->fetchAll();
 }
 
+// 未納品一覧を 'order_no-line_no' をキーにした連想配列にする（POST の検証で一覧を1回だけ取って使い回す）
+function indexUndeliveredList(array $list): array
+{
+    $index = [];
+    foreach ($list as $row) {
+        $index[$row['order_no'] . '-' . $row['line_no']] = $row;
+    }
+    return $index;
+}
+
 // 未納品明細1行（order_no, line_no）。無い・残数0なら null
+// ※ 複数行を調べるときは getUndeliveredList() ＋ indexUndeliveredList() で1回だけ取る（行ごとに呼ぶと一覧SQLが行数分走る）
 function findUndeliveredLine(int $orderNo, int $lineNo, array $filter = []): ?array
 {
-    foreach (getUndeliveredList($filter) as $row) {
-        if ((int)$row['order_no'] === $orderNo && (int)$row['line_no'] === $lineNo) {
-            return $row;
-        }
-    }
-    return null;
+    return indexUndeliveredList(getUndeliveredList($filter))[$orderNo . '-' . $lineNo] ?? null;
 }
 
 // ---------------------------------------------------------------
-// 返品できる納品明細（F-50）
-// 発注明細ごとに 返品可能数 = 確定済み納品数（is_return=0）＋ 返品数合計（is_return=1、マイナス。未確定も含む）
+// 返品できる発注明細（F-50）
+// 発注明細ごとに 返品可能数 = 確定済み納品数（is_return=0）
+//                           ＋ 未確定のマイナス納品（訂正。is_return=0）
+//                           ＋ 返品数合計（is_return=1、マイナス。未確定も含む）
 // 返品可能数 > 0 の行を返す
 // ---------------------------------------------------------------
 function getReturnableList(string $supplierCode): array
@@ -192,6 +221,8 @@ function getReturnableList(string $supplierCode): array
                 p.product_name, p.spec, p.pack_qty, p.storage_type, od.contract_price,
                 SUM(CASE WHEN dh.is_return = 0 AND dh.is_confirmed = 1 THEN dd.delivery_qty ELSE 0 END) AS delivered_qty,
                 MAX(CASE WHEN dh.is_return = 0 AND dh.is_confirmed = 1 THEN dh.delivery_date END)     AS last_delivery_date,
+                SUM(CASE WHEN dh.is_return = 0 AND dh.is_confirmed = 0 AND dd.delivery_qty < 0
+                         THEN dd.delivery_qty ELSE 0 END)                                               AS pending_minus_qty,
                 SUM(CASE WHEN dh.is_return = 1 THEN dd.delivery_qty ELSE 0 END)                         AS returned_qty
            FROM t_delivery_detail dd
            JOIN t_delivery dh     ON dh.delivery_no = dd.delivery_no
@@ -201,14 +232,72 @@ function getReturnableList(string $supplierCode): array
           WHERE dh.supplier_code = :supplier_code
           GROUP BY dd.order_no, dd.order_line_no, o.order_date, dd.product_code,
                    p.product_name, p.spec, p.pack_qty, p.storage_type, od.contract_price
-         HAVING delivered_qty + returned_qty > 0
+         HAVING delivered_qty + pending_minus_qty + returned_qty > 0
           ORDER BY last_delivery_date DESC, dd.order_no, dd.order_line_no'
     );
     $st->execute([':supplier_code' => $supplierCode]);
     $rows = $st->fetchAll();
     foreach ($rows as &$r) {
-        $r['returnable_qty'] = (int)$r['delivered_qty'] + (int)$r['returned_qty'];
+        $r['returnable_qty'] = (int)$r['delivered_qty'] + (int)$r['pending_minus_qty'] + (int)$r['returned_qty'];
     }
     unset($r);
     return $rows;
+}
+
+// ---------------------------------------------------------------
+// 返品の候補になる確定済み納品明細（SC-50 の一覧。06-3 プロンプト6）
+// 確定済み・is_return=0・数量プラスの納品明細を1行ずつ（納品日・伝票No つき）返す
+// 返品明細は元の納品明細を指す列を持たない（発注明細 order_no / order_line_no だけ）ため、
+// 返品可能数は発注明細単位（getReturnableList）で計算し、各行に line_returnable_qty として付ける
+//   row_max_qty = min(その納品明細の数量, 発注明細の返品可能数) … 1行に入力できる上限
+// 同じ発注明細の複数行に入力したときは、合計が line_returnable_qty 以下かを POST 側で確かめる
+// ---------------------------------------------------------------
+function getReturnableDeliveryDetails(string $supplierCode): array
+{
+    $lines = [];
+    foreach (getReturnableList($supplierCode) as $r) {
+        $lines[$r['order_no'] . '-' . $r['order_line_no']] = $r;
+    }
+    if (!$lines) {
+        return [];
+    }
+    $st = getDb()->prepare(
+        'SELECT dd.delivery_no, dd.line_no, dh.delivery_date, dd.order_no, dd.order_line_no, o.order_date,
+                dd.product_code, p.product_name, p.spec, p.pack_qty, p.storage_type,
+                dd.delivery_qty, dd.contract_price
+           FROM t_delivery_detail dd
+           JOIN t_delivery dh ON dh.delivery_no = dd.delivery_no
+           JOIN t_order o     ON o.order_no = dd.order_no
+           JOIN m_product p   ON p.product_code = dd.product_code
+          WHERE dh.supplier_code = :supplier_code
+            AND dh.is_return = 0 AND dh.is_confirmed = 1 AND dd.delivery_qty > 0
+          ORDER BY dh.delivery_date DESC, dd.delivery_no DESC, dd.line_no'
+    );
+    $st->execute([':supplier_code' => $supplierCode]);
+    $rows = [];
+    foreach ($st->fetchAll() as $d) {
+        $line = $lines[$d['order_no'] . '-' . $d['order_line_no']] ?? null;
+        if ($line === null) {
+            continue;   // その発注明細はもう返品できない（返品済み・訂正済み）
+        }
+        $d['delivered_qty']       = (int)$line['delivered_qty'];
+        $d['returned_qty']        = (int)$line['returned_qty'];
+        $d['line_returnable_qty'] = (int)$line['returnable_qty'];
+        $d['row_max_qty']         = min((int)$d['delivery_qty'], (int)$line['returnable_qty']);
+        $rows[] = $d;
+    }
+    return $rows;
+}
+
+// 伝票の対象になる発注明細の行ロック（'order_no-line_no' の配列）。トランザクション内で呼ぶ
+// 同じ発注明細への納品・訂正・返品の登録と未確定伝票の削除を順番に処理させ、残数・返品可能数のチェックをすり抜けないようにする
+function getOrderDetailsForUpdate(array $keys): void
+{
+    $st = getDb()->prepare('SELECT order_no FROM t_order_detail WHERE order_no = :no AND line_no = :line FOR UPDATE');
+    $keys = array_values(array_unique(array_map('strval', $keys)));
+    sort($keys);   // いつも同じ順にロックする（デッドロックを起こしにくくする）
+    foreach ($keys as $key) {
+        [$orderNo, $lineNo] = array_map('intval', explode('-', $key) + [0, 0]);
+        $st->execute([':no' => $orderNo, ':line' => $lineNo]);
+    }
 }

@@ -33,7 +33,7 @@ function getSalesOfDay(PDO $pdo, string $date): array
 }
 
 $products = $pdo->query(
-    'SELECT p.product_code, p.product_name, p.spec, p.list_price, p.storage_type, COALESCE(s.stock_qty, 0) AS stock_qty
+    'SELECT p.product_code, p.product_name, p.spec, p.pack_qty, p.list_price, p.storage_type, COALESCE(s.stock_qty, 0) AS stock_qty
        FROM m_product p LEFT JOIN t_stock s ON s.product_code = p.product_code
       WHERE p.is_deleted = 0 ORDER BY p.product_kana, p.product_code'
 )->fetchAll();
@@ -103,8 +103,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             setFlash('success', formatDate($salesDate) . " の売上を登録しました（{$changed}商品）。売上確定で在庫に反映してください");
             redirect('/sales/sales_input.php?sales_date=' . rawurlencode($salesDate));
         } catch (Throwable $e) {
-            $pdo->rollBack();
-            $errors[] = '登録に失敗しました：' . $e->getMessage();
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            // 詳しい原因はログにだけ出す（画面には出さない）
+            error_log('[sales_input] ' . $e->getMessage());
+            $errors[] = '登録に失敗しました。時間をおいてもう一度お試しください';
         }
     }
     setFlash('error', implode("\n", $errors));
@@ -112,6 +116,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // GET時：同じ売上日に登録済みの数量を初期表示
 $day = isValidDate($salesDate) ? getSalesOfDay($pdo, $salesDate) : [];
+
+// この日の状態（未確定の行がある商品の数・確定済みだけの商品の数）
+$unconfirmedCount = 0;
+$confirmedCount   = 0;
+foreach ($day as $r) {
+    if ($r['unconfirmed_no'] !== null) {
+        $unconfirmedCount++;
+    } else {
+        $confirmedCount++;
+    }
+}
 
 $pageTitle = '売上入力';
 require_once __DIR__ . '/../common/header.php';
@@ -121,21 +136,43 @@ require_once __DIR__ . '/../common/header.php';
   <noscript><button type="submit" class="btn">表示</button></noscript>
 </form>
 
+<p>
+  <?= h(formatDate($salesDate)) ?> の状態：
+  <?php if (!$day): ?>
+    未登録
+  <?php elseif ($unconfirmedCount > 0): ?>
+    <span class="status-unconfirmed">未確定あり（<?= h($unconfirmedCount) ?>商品）</span>
+    <?php if ($confirmedCount > 0): ?>／<span class="status-confirmed">確定済（<?= h($confirmedCount) ?>商品）</span><?php endif; ?>
+    … 売上確定で在庫に反映してください
+  <?php else: ?>
+    <span class="status-confirmed">すべて確定済（<?= h($confirmedCount) ?>商品）</span>
+  <?php endif; ?>
+</p>
+
 <form method="post" data-confirm="<?= h(formatDate($salesDate)) ?> の売上を登録します。よろしいですか？">
   <input type="hidden" name="sales_date" value="<?= h($salesDate) ?>">
-  <p class="note">売れた数を入力してください（空欄の商品は登録しません）。登録済みの日を開くと、その数量が入っています。書き換えると上書きになります。</p>
+  <p class="note">売れた数を入力してください（空欄の商品は登録しません）。登録済みの日を開くと、その数量が入っています。書き換えると上書きになります。売上金額は 定価 × 売上数 です。</p>
   <table class="data-table">
     <thead>
-      <tr><th>商品コード</th><th>商品名</th><th>定価</th><th>現在庫</th><th>登録済（確定／未確定）</th><th>売上数</th></tr>
+      <tr><th>商品コード</th><th>商品名</th><th>規格</th><th>入数</th><th>定価</th><th>現在庫</th><th>登録済（確定／未確定）</th><th>状態</th><th>売上数</th><th>売上金額</th></tr>
     </thead>
     <tbody>
-      <?php foreach ($products as $p):
+      <?php
+      $totalQty    = 0;
+      $totalAmount = 0;
+      foreach ($products as $p):
           $cur = $day[$p['product_code']] ?? null;
           $registered = $cur ? (int)$cur['confirmed_qty'] + (int)$cur['unconfirmed_qty'] : null;
-          $value = $qtyInput[$p['product_code']] ?? ($registered ?? ''); ?>
-      <tr class="<?= (int)$p['stock_qty'] <= 0 ? 'stock-warning' : '' ?>">
+          $value = $qtyInput[$p['product_code']] ?? ($registered ?? '');
+          $qty   = toIntOrNull($value);
+          $amount = $qty === null ? null : $qty * (int)$p['list_price'];
+          $totalQty    += $qty ?? 0;
+          $totalAmount += $amount ?? 0; ?>
+      <tr class="js-sales-row <?= (int)$p['stock_qty'] <= 0 ? 'stock-warning' : '' ?>" data-price="<?= h($p['list_price']) ?>">
         <td><?= h($p['product_code']) ?></td>
-        <td><?= h($p['product_name'] . ' ' . $p['spec']) ?><?= storageBadge($p['storage_type']) ?></td>
+        <td><?= h($p['product_name']) ?><?= storageBadge($p['storage_type']) ?></td>
+        <td><?= h($p['spec']) ?></td>
+        <td class="num"><?= h($p['pack_qty']) ?></td>
         <td class="num"><?= h(formatYen($p['list_price'])) ?></td>
         <td class="num"><?= h($p['stock_qty']) ?></td>
         <td class="num">
@@ -143,10 +180,23 @@ require_once __DIR__ . '/../common/header.php';
             <?= h($cur['confirmed_qty']) ?> ／ <span class="<?= (int)$cur['unconfirmed_qty'] !== 0 ? 'status-unconfirmed' : '' ?>"><?= h($cur['unconfirmed_qty']) ?></span>
           <?php endif; ?>
         </td>
-        <td><input type="number" name="sales_qty[<?= h($p['product_code']) ?>]" value="<?= h($value) ?>" step="1"></td>
+        <?php if ($cur === null): ?>
+          <td>未登録</td>
+        <?php else: ?>
+          <?= statusCell($cur['unconfirmed_no'] === null ? 1 : 0) ?>
+        <?php endif; ?>
+        <td><input type="number" name="sales_qty[<?= h($p['product_code']) ?>]" class="js-sales-qty" value="<?= h($value) ?>" step="1"></td>
+        <td class="num js-sales-amount <?= $amount !== null ? minusClass($amount) : '' ?>"><?= $amount === null ? '' : h(formatYen($amount)) ?></td>
       </tr>
       <?php endforeach; ?>
     </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="8" class="num">合計</td>
+        <td class="num" id="salesTotalQty"><?= h($totalQty) ?></td>
+        <td class="num" id="salesTotalAmount"><?= h(formatYen($totalAmount)) ?></td>
+      </tr>
+    </tfoot>
   </table>
   <div class="btn-area">
     <button type="submit" class="btn btn-primary">登録</button>
@@ -154,4 +204,35 @@ require_once __DIR__ . '/../common/header.php';
     <a href="/menu.php" class="btn">メニューへ戻る</a>
   </div>
 </form>
+<script>
+// 売上数を入れると 売上金額（定価 × 売上数）と合計をその場で計算する（登録時の金額はサーバ側で計算し直す）
+(() => {
+    const yen = (n) => (n < 0 ? '-' : '') + '¥' + Math.abs(n).toLocaleString('ja-JP');   // formatYen() と同じ形
+    const rows = document.querySelectorAll('.js-sales-row');
+    function update() {
+        let totalQty = 0;
+        let totalAmount = 0;
+        rows.forEach((row) => {
+            const input = row.querySelector('.js-sales-qty');
+            const cell = row.querySelector('.js-sales-amount');
+            const v = input.value.trim();
+            if (v === '' || !/^-?\d+$/.test(v)) {
+                cell.textContent = '';
+                cell.classList.remove('qty-minus');
+                return;
+            }
+            const qty = parseInt(v, 10);
+            const amount = qty * Number(row.dataset.price);
+            cell.textContent = yen(amount);
+            cell.classList.toggle('qty-minus', amount < 0);
+            totalQty += qty;
+            totalAmount += amount;
+        });
+        document.getElementById('salesTotalQty').textContent = String(totalQty);
+        document.getElementById('salesTotalAmount').textContent = yen(totalAmount);
+    }
+    rows.forEach((row) => row.querySelector('.js-sales-qty').addEventListener('input', update));
+    update();
+})();
+</script>
 <?php require_once __DIR__ . '/../common/footer.php'; ?>

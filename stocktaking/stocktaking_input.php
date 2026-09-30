@@ -18,7 +18,7 @@ $reasonInput = [];
 
 function getStockList(PDO $pdo, string $keyword): array
 {
-    $sql = 'SELECT p.product_code, p.product_name, p.spec, p.storage_type, COALESCE(s.stock_qty, 0) AS stock_qty
+    $sql = 'SELECT p.product_code, p.product_name, p.spec, p.pack_qty, p.storage_type, COALESCE(s.stock_qty, 0) AS stock_qty
               FROM m_product p LEFT JOIN t_stock s ON s.product_code = p.product_code
              WHERE p.is_deleted = 0';
     $params = [];
@@ -37,6 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stocktakingDate = postStr('stocktaking_date');
     $actualInput     = postArray('actual_qty');
     $reasonInput     = postArray('reason');
+    $bookInput       = postArray('book_qty');   // 画面を開いたときの在庫数（その後に在庫が動いていないかの確認用）
     if (!isValidDate($stocktakingDate)) {
         $errors[] = '棚卸日を正しく入力してください';
     }
@@ -61,6 +62,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = "{$code} {$p['product_name']}：原因・理由は200文字以内で入力してください";
             continue;
         }
+        // 画面を開いた後に売上確定・納品確定などで在庫が動いていたら、差異と理由の前提が変わるので更新しない
+        $book = toIntOrNull($bookInput[$code] ?? null);
+        if ($book === null || $book !== (int)$p['stock_qty']) {
+            $errors[] = "{$code} {$p['product_name']}：画面を開いた後に在庫数が変わりました（現在 {$p['stock_qty']}）。差異を確認してもう一度更新してください";
+            continue;
+        }
         $targets[$code] = ['actual' => $actual, 'reason' => $reason];
     }
     if (!$errors && !$targets) {
@@ -68,18 +75,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // 2. DB更新（在庫は applyStocktaking() 経由。差異0の商品は記録されない）
+    // applyStocktaking() は商品ごとに自分でトランザクションを張る（slip.php の仕様）ため、
+    // 全商品を1トランザクションにまとめることはできない（PDO は入れ子の beginTransaction で例外になる）。
+    // そこで上の 1. で「全行のチェック（実数・理由・文字数・在庫数が画面表示時から変わっていないか）」を
+    // 先に済ませ、1件でもエラーがあれば1件も更新しない。更新中に失敗したらそこで止め、
+    // 更新済みの商品と未更新の商品を画面に出す
     if (!$errors) {
         $recorded = 0;
-        try {
-            foreach ($targets as $code => $t) {
+        $applied  = [];
+        foreach ($targets as $code => $t) {
+            try {
                 if (applyStocktaking($code, $t['actual'], $t['reason'], $stocktakingDate)) {
                     $recorded++;
                 }
+                $applied[] = $code;
+            } catch (Throwable $e) {
+                // 詳しい原因はログにだけ出す（画面には出さない）
+                error_log('[stocktaking_input] ' . $code . ' ' . $e->getMessage());
+                $rest = array_diff(array_keys($targets), $applied);
+                $errors[] = "{$code} の更新中にエラーが発生したため、処理を止めました";
+                $errors[] = $applied
+                    ? '更新済み（' . count($applied) . '件）：' . implode('、', $applied)
+                    : '更新済みの商品はありません';
+                $errors[] = '未更新（' . count($rest) . '件）：' . implode('、', $rest) . '。画面を開き直して、未更新の商品をもう一度入力してください';
+                break;
             }
-            setFlash('success', "棚卸を登録しました（差異があった商品：{$recorded}件。在庫を実数に更新しました）");
+        }
+        if (!$errors) {
+            setFlash('success', count($applied) . "件の実数を登録しました（差異があった商品：{$recorded}件。棚卸伝票に記録し、在庫を実数に更新しました）");
             redirect('/stocktaking/stocktaking_input.php' . ($keyword !== '' ? '?keyword=' . rawurlencode($keyword) : ''));
-        } catch (Throwable $e) {
-            $errors[] = "途中で失敗しました（{$recorded}件は登録済み）：" . $e->getMessage();
         }
     }
     setFlash('error', implode("\n", $errors));
@@ -107,17 +131,19 @@ require_once __DIR__ . '/../common/header.php';
   <p class="note">数えた商品だけ実数を入れてください（空欄は変更しません）。在庫と違う場合は原因・理由が必須です。</p>
   <table class="data-table">
     <thead>
-      <tr><th>商品コード</th><th>商品名</th><th>現在の在庫数</th><th>実数</th><th>差異</th><th>差異の原因・理由</th></tr>
+      <tr><th>商品コード</th><th>商品名</th><th>規格</th><th>入数</th><th>現在の在庫数</th><th>実数</th><th>差異</th><th>差異の原因・理由</th></tr>
     </thead>
     <tbody>
       <?php if (!$list): ?>
-        <tr><td colspan="6">該当する商品がありません</td></tr>
+        <tr><td colspan="8">該当する商品がありません</td></tr>
       <?php endif; ?>
       <?php foreach ($list as $p): $code = $p['product_code']; ?>
       <tr class="js-stock-row <?= (int)$p['stock_qty'] <= 0 ? 'stock-warning' : '' ?>" data-stock="<?= h($p['stock_qty']) ?>">
         <td><?= h($code) ?></td>
-        <td><?= h($p['product_name'] . ' ' . $p['spec']) ?><?= storageBadge($p['storage_type']) ?></td>
-        <td class="num"><?= h($p['stock_qty']) ?></td>
+        <td><?= h($p['product_name']) ?><?= storageBadge($p['storage_type']) ?></td>
+        <td><?= h($p['spec']) ?></td>
+        <td class="num"><?= h($p['pack_qty']) ?></td>
+        <td class="num"><?= h($p['stock_qty']) ?><input type="hidden" name="book_qty[<?= h($code) ?>]" value="<?= h($p['stock_qty']) ?>"></td>
         <td><input type="number" name="actual_qty[<?= h($code) ?>]" class="js-actual" value="<?= h($actualInput[$code] ?? '') ?>" min="0" step="1"></td>
         <td class="num js-diff"></td>
         <td><input type="text" name="reason[<?= h($code) ?>]" class="js-reason" value="<?= h($reasonInput[$code] ?? '') ?>" maxlength="200"></td>

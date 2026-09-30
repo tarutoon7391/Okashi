@@ -14,17 +14,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     unset($_SESSION['otp']);
     if ($operatorCode === '' || $password === '') {
         setFlash('error', '操作者コードとパスワードを入力してください');
+    } elseif (($remain = loginLockRemain($operatorCode)) > 0) {
+        // 総当たり対策：ロック中はパスワードを照合しない
+        setFlash('error', 'パスワードを' . LOGIN_MAX_FAILS . '回まちがえたため、ロックしています。約' . (int)ceil($remain / 60) . '分後にやり直してください');
     } else {
         try {
             if (login($operatorCode, $password)) {
+                clearLoginFailures($operatorCode);
                 redirect('/otp_input.php');
             }
             if (isset($_SESSION['otp'])) {
                 // パスワードは合っていたがメールが送れなかった
                 unset($_SESSION['otp']);
+                clearLoginFailures($operatorCode);
                 setFlash('error', 'ワンタイムコードのメール送信に失敗しました。管理者に連絡してください');
             } else {
-                setFlash('error', '操作者コードまたはパスワードが違います');
+                recordLoginFailure($operatorCode);
+                setFlash('error', '操作者コードまたはパスワードが違います（' . LOGIN_MAX_FAILS . '回まちがえると' . LOGIN_LOCK_MIN . '分ロックします）');
             }
         } catch (Throwable $e) {
             error_log('[login] ' . $e->getMessage());

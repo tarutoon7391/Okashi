@@ -14,25 +14,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         setFlash('error', '確定する売上日を選んでください');
         redirect('/sales/sales_confirm.php');
     }
-    $in = implode(',', array_fill(0, count($dates), '?'));
-    $st = $pdo->prepare("SELECT sales_no, product_code FROM t_sales WHERE is_confirmed = 0 AND sales_date IN ($in) ORDER BY sales_no");
-    $st->execute($dates);
-    $rows = $st->fetchAll();
-    $count = 0;
-    $messages = [];
-    foreach ($rows as $r) {
-        try {
-            confirmSales((int)$r['sales_no']);
-            $count++;
-        } catch (Throwable $e) {
-            $messages[] = "売上No.{$r['sales_no']}：" . $e->getMessage();
+    // 売上日を1単位として確定する。confirmSales() は1行ごとに自分でトランザクションを張るため
+    // 日付全体を1トランザクションにはできない（slip.php の仕様）。そこで
+    //   ① 確定前に、その日の未確定行をもう一度読み直す（別の人が確定・変更していないか）
+    //   ② 1行でも失敗したら、その日の残りの行は確定しないで止める（エラーとして報告）
+    // という形で「日付ごとにまとめて確定」に近づけている
+    sort($dates);
+    $st = $pdo->prepare('SELECT sales_no, product_code FROM t_sales WHERE is_confirmed = 0 AND sales_date = :date ORDER BY sales_no');
+    $count    = 0;
+    $okDates  = [];
+    $errors   = [];
+    $products = [];
+    foreach (array_unique($dates) as $date) {
+        $st->execute([':date' => $date]);
+        $rows = $st->fetchAll();
+        if (!$rows) {
+            $errors[] = formatDate($date) . '：未確定の売上がありません（他の人が確定した可能性があります）';
+            continue;
+        }
+        $done = 0;
+        foreach ($rows as $r) {
+            try {
+                confirmSales((int)$r['sales_no']);
+                $done++;
+                $products[] = $r['product_code'];
+            } catch (Throwable $e) {
+                // PDOException などシステムの詳細は画面に出さずログへ。slip.php が投げる業務メッセージ（RuntimeException）だけ表示する
+                error_log('[sales_confirm] sales_no=' . $r['sales_no'] . ' ' . $e->getMessage());
+                $reason = ($e instanceof RuntimeException && !($e instanceof PDOException)) ? $e->getMessage() : 'システムエラーが発生しました';
+                $errors[] = formatDate($date) . "：売上No.{$r['sales_no']} の確定に失敗したため、この日の残りの売上は確定していません（{$reason}）"
+                          . ($done > 0 ? "。この日のうち{$done}件は確定済みです" : '');
+                break;
+            }
+        }
+        $count += $done;
+        if ($done === count($rows)) {
+            $okDates[] = formatDate($date);
         }
     }
-    foreach (getMinusStockProducts(array_unique(array_column($rows, 'product_code'))) as $m) {
-        $messages[] = "在庫がマイナスです：{$m['product_code']} {$m['product_name']}（{$m['stock_qty']}）。棚卸で実数を確認してください";
+    $warnings = [];
+    foreach (getMinusStockProducts(array_values(array_unique($products))) as $m) {
+        $warnings[] = "在庫がマイナスです：{$m['product_code']} {$m['product_name']}（{$m['stock_qty']}）。棚卸で実数を確認してください";
     }
-    $done = "{$count}件の売上を確定し、在庫を減らしました";
-    setFlash($messages ? 'warning' : 'success', $messages ? $done . "\n" . implode("\n", $messages) : $done);
+    $doneMsg = $okDates
+        ? implode('・', $okDates) . " の売上を確定し、在庫を減らしました（{$count}件）"
+        : "{$count}件の売上を確定しました";
+    if ($errors) {
+        // 失敗があれば error（06-4 プロンプト2：例外はまとめて error）
+        setFlash('error', implode("\n", array_merge($errors, [$doneMsg], $warnings)));
+    } elseif ($warnings) {
+        setFlash('warning', $doneMsg . "\n" . implode("\n", $warnings));
+    } else {
+        setFlash('success', $doneMsg);
+    }
     redirect('/sales/sales_confirm.php');
 }
 

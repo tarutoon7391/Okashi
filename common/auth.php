@@ -21,11 +21,30 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // 未ログインなら index.php（ログイン画面）へ
+// ログイン中でも毎回 m_operator を1件読み直し、削除・権限変更をすぐ反映する
+//   削除済み（または存在しない）→ ログアウトしてログイン画面へ
+//   氏名・発注承認可はセッションの値を最新に書き換える（requireApprover もこの値で判定）
 function requireLogin(): void
 {
     if (empty($_SESSION['operator_code'])) {
         redirect('/index.php');
     }
+    $st = getDb()->prepare(
+        'SELECT operator_name, can_approve_order
+           FROM m_operator
+          WHERE operator_code = :code AND is_deleted = 0'
+    );
+    $st->execute([':code' => $_SESSION['operator_code']]);
+    $row = $st->fetch();
+    if ($row === false) {
+        // ログイン情報を消してセッションIDも作り直す（メッセージを出すためセッション自体は残す）
+        $_SESSION = [];
+        session_regenerate_id(true);
+        setFlash('error', '操作者が削除されたため、ログアウトしました');
+        redirect('/index.php');
+    }
+    $_SESSION['operator_name']     = $row['operator_name'];
+    $_SESSION['can_approve_order'] = (int)$row['can_approve_order'];
 }
 
 // 発注承認可（can_approve_order=1）の操作者だけ通す。発注確定画面で使う
@@ -49,6 +68,77 @@ function findOperatorForLogin(string $code): ?array
     $st->execute([':code' => $code]);
     $row = $st->fetch();
     return $row === false ? null : $row;
+}
+
+// ---------------------------------------------------------------
+// ログインの総当たり対策（index.php で使う）
+// 同じ操作者コードでパスワードを LOGIN_MAX_FAILS 回まちがえたら LOGIN_LOCK_MIN 分ロックする。
+// テーブルは増やさず、一時ディレクトリの JSON ファイル1つに記録する（コードは sha1 にして保存）
+// ※ 再起動（再デプロイ）で消えるが、総当たりを遅らせる目的なので十分
+// ---------------------------------------------------------------
+const LOGIN_MAX_FAILS = 5;
+const LOGIN_LOCK_MIN  = 5;
+
+// 記録ファイルを排他ロックして読み、$fn で書き換えて保存する。$fn の戻り値をそのまま返す
+function withLoginLockFile(callable $fn)
+{
+    $path = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'okashi_login_lock.json';
+    $fp = @fopen($path, 'c+');
+    if ($fp === false) {
+        $data = [];
+        return $fn($data);   // 書けない環境でもログイン自体は止めない
+    }
+    flock($fp, LOCK_EX);
+    $data = json_decode(stream_get_contents($fp) ?: '[]', true) ?: [];
+    // 期限切れの記録は掃除する
+    $now = time();
+    foreach ($data as $k => $v) {
+        if (($v['until'] ?? 0) < $now && ($v['last'] ?? 0) < $now - LOGIN_LOCK_MIN * 60) {
+            unset($data[$k]);
+        }
+    }
+    $result = $fn($data);
+    ftruncate($fp, 0);
+    rewind($fp);
+    fwrite($fp, json_encode($data));
+    fflush($fp);
+    flock($fp, LOCK_UN);
+    fclose($fp);
+    return $result;
+}
+
+// ロック中なら残り秒数、ロックされていなければ 0
+function loginLockRemain(string $code): int
+{
+    $key = sha1($code);
+    return withLoginLockFile(function (array &$data) use ($key) {
+        return max(0, ($data[$key]['until'] ?? 0) - time());
+    });
+}
+
+// パスワード失敗を1回記録。LOGIN_MAX_FAILS 回目でロック開始
+function recordLoginFailure(string $code): void
+{
+    $key = sha1($code);
+    withLoginLockFile(function (array &$data) use ($key) {
+        $now   = time();
+        $fails = ($data[$key]['fails'] ?? 0) + 1;
+        $data[$key] = ['fails' => $fails, 'last' => $now, 'until' => 0];
+        if ($fails >= LOGIN_MAX_FAILS) {
+            $data[$key] = ['fails' => 0, 'last' => $now, 'until' => $now + LOGIN_LOCK_MIN * 60];
+        }
+        return null;
+    });
+}
+
+// パスワードが合ったら失敗回数を消す
+function clearLoginFailures(string $code): void
+{
+    $key = sha1($code);
+    withLoginLockFile(function (array &$data) use ($key) {
+        unset($data[$key]);
+        return null;
+    });
 }
 
 // 1段階目（パスワード）の認証。成功したら verifySecondFactor() でコードを送る

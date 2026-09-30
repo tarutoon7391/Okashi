@@ -1,6 +1,7 @@
 <?php
 // 操作者削除（処理のみ・F-72）担当A
 // is_deleted=1 に更新する（論理削除）。自分自身と、最後の発注承認可の操作者は削除しない → SC-74
+// 削除できるのは発注承認可の操作者だけ（質問No.5）。承認不可の人が POST してきても弾く
 require_once __DIR__ . '/../common/auth.php';
 require_once __DIR__ . '/../common/db.php';
 require_once __DIR__ . '/../common/functions.php';
@@ -12,6 +13,15 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $pdo  = getDb();
 $code = postStr('operator_code');
 $me   = currentOperator();
+
+// 権限はセッションではなく DB の最新値で判定する（ログイン中に権限を外された場合に備える）
+$st = $pdo->prepare('SELECT can_approve_order FROM m_operator WHERE operator_code = :code AND is_deleted = 0');
+$st->execute([':code' => $me['operator_code']]);
+$me['can_approve_order'] = (int)$st->fetchColumn();
+if ($me['can_approve_order'] !== 1) {
+    setFlash('error', '操作者の削除は発注承認可の操作者だけが行えます');
+    redirect('/master/operator_list.php');
+}
 
 if ($code === $me['operator_code']) {
     setFlash('error', '自分自身は削除できません');

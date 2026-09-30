@@ -11,12 +11,14 @@
                 diffCell.textContent = '';
                 reason.required = false;
                 row.classList.remove('qty-minus');
+                diffCell.classList.remove('qty-minus');
                 return;
             }
             const diff = Math.trunc(Number(actual.value)) - stock;
             diffCell.textContent = diff > 0 ? '+' + diff : String(diff);
             reason.required = diff !== 0;
             row.classList.toggle('qty-minus', diff < 0);
+            diffCell.classList.toggle('qty-minus', diff !== 0);   // 差異があれば赤（06-4 プロンプト3）
         }
 
         actual.addEventListener('input', update);
