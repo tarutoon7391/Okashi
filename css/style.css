@@ -87,22 +87,27 @@ h2 { font-size: 16px; margin: 20px 0 8px; border-left: 4px solid #2b4c7e; paddin
 .login-box { max-width: 480px; background: #fff; border: 1px solid #ddd; padding: 16px; }
 
 /* メニュー */
-.menu-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
-.menu-tabs { display: flex; flex-direction: column; gap: 8px; }
+/* 左（ジャンル）と右（行き先）で1つの枠を共用し、間は線1本で区切る。枠の大きさはジャンルを切り替えても変わらない */
+.menu-layout { display: grid; grid-template-columns: 1fr 1fr; min-height: 520px; background: #fff; border: 1px solid #ddd; }
+.menu-tabs { display: flex; flex-direction: column; gap: 8px; padding: 20px; border-right: 1px solid #ddd; }
 .menu-tab { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 14px 16px; border: 1px solid #bbb; border-radius: 6px; background: #fff; color: #222; font: inherit; font-size: 17px; font-weight: bold; text-align: left; cursor: pointer; }
 .menu-tab:hover { border-color: #2b6cb0; }
 .menu-tab[aria-selected="true"] { background: #2b4c7e; border-color: #2b4c7e; color: #fff; }
 .menu-tab:focus-visible, .menu-button:focus-visible { outline: 3px solid #f0b429; outline-offset: 2px; }
-.menu-panel { background: #fff; border: 1px solid #ddd; padding: 4px 16px 16px; margin-bottom: 12px; }
+.menu-panels { padding: 20px; }
+.menu-panel { margin-bottom: 20px; }
+.menu-panel h2 { margin-top: 0; }
 .menu-layout.is-tabbed .menu-panel { margin-bottom: 0; }
-.menu-buttons { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.menu-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .menu-button { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; min-height: 56px; padding: 10px 12px; border: 1px solid #2b6cb0; border-radius: 6px; background: #f3f8fd; color: #1a4a80; font-size: 16px; font-weight: bold; text-align: center; text-decoration: none; }
 .menu-button:hover { background: #2b6cb0; color: #fff; }
 .menu-button .badge, .menu-tab .badge { color: #222; font-weight: normal; }
 @media (max-width: 600px) {
-    .menu-layout { grid-template-columns: 1fr; }
-    .menu-tabs { flex-direction: row; flex-wrap: wrap; }
+    .menu-layout { grid-template-columns: 1fr; min-height: 0; }
+    .menu-tabs { flex-direction: row; flex-wrap: wrap; padding: 12px; border-right: none; border-bottom: 1px solid #ddd; }
     .menu-tab { width: auto; flex: 1 1 auto; padding: 10px 12px; font-size: 15px; }
+    .menu-panels { padding: 12px; }
+    .menu-layout.is-tabbed .menu-panels { min-height: 420px; }
 }
 .badge { display: inline-block; font-size: 12px; background: #fff6bf; border: 1px solid #d9b400; border-radius: 10px; padding: 0 8px; line-height: 1.6; }
 
