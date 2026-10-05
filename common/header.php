@@ -12,7 +12,7 @@ $isPublic = $isPublic ?? false;
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= h($pageTitle) ?> | <?= h(APP_NAME) ?></title>
-<link rel="stylesheet" href="/css/style.css?v=5">
+<link rel="stylesheet" href="/css/style.css?v=6">
 </head>
 <body>
 <header class="app-header">
