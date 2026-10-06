@@ -1,11 +1,9 @@
 <?php
 // SC-01 メニュー（F-01）
-// 上：対応が必要なもの（未確定の件数・在庫0）。下：業務ごとのボタン（common/nav.php の定義を使う）
-// 発注確定は発注承認可（can_approve_order=1）の操作者にだけ出す（質問No.5）
+// 発注確定リンクは発注承認可（can_approve_order=1）の操作者にだけ出す
 require_once __DIR__ . '/common/auth.php';
 require_once __DIR__ . '/common/db.php';
 require_once __DIR__ . '/common/functions.php';
-require_once __DIR__ . '/common/nav.php';
 requireLogin();
 $pdo = getDb();
 
@@ -18,44 +16,81 @@ $count = $pdo->query(
         (SELECT COUNT(*) FROM t_stock s JOIN m_product p ON p.product_code = s.product_code
           WHERE s.stock_qty <= 0 AND p.is_deleted = 0)                             AS stock_cnt'
 )->fetch();
-$isApprover = currentOperator()['can_approve_order'] === 1;
 
-// 対応が必要なもの：[ジャンル, 見出し, 件数, 行き先ラベル, URL]。発注確定は承認可の人だけリンクにする
-$todos = [
-    ['発注',     '未確定の発注', (int)$count['order_cnt'],    '発注確定へ',       $isApprover ? '/order/order_confirm.php' : ''],
-    ['納品・返品', '未確定の伝票', (int)$count['delivery_cnt'], '納品・返品確定へ', '/delivery/delivery_confirm.php'],
-    ['売上',     '未確定の売上', (int)$count['sales_cnt'],    '売上確定へ',       '/sales/sales_confirm.php'],
-    ['在庫',     '在庫0の商品',  (int)$count['stock_cnt'],    '商品マスタで確認', '/master/product_list.php'],
+function badge(int $n, string $label): string
+{
+    return $n > 0 ? ' <span class="badge">' . h($label . ' ' . $n) . '</span>' : '';
+}
+
+$op = currentOperator();
+$isApprover = $op['can_approve_order'] === 1;
+
+// ジャンル（左のボタン）と、その中の行き先（右のボタン）
+//   items：[表示名, URL, バッジの件数, バッジのラベル]。件数が 0 ならバッジは出さない
+$groups = [
+    'order' => ['name' => '発注', 'items' => array_merge(
+        [['発注入力', '/order/order_input.php', 0, '']],
+        // 発注確定は発注承認可（can_approve_order=1）の操作者にだけ出す
+        $isApprover ? [['発注確定', '/order/order_confirm.php', (int)$count['order_cnt'], '未確定']] : [],
+        [['未納品一覧表', '/delivery/undelivered_print.php', 0, '']]
+    )],
+    'delivery' => ['name' => '納品・返品', 'items' => [
+        ['納品入力', '/delivery/delivery_input.php', 0, ''],
+        ['納品確定', '/delivery/delivery_confirm.php', (int)$count['delivery_cnt'], '未確定'],
+        ['返品伝票', '/return_goods/return_goods_input.php', 0, ''],
+    ]],
+    'sales' => ['name' => '売上・棚卸', 'items' => [
+        ['売上入力', '/sales/sales_input.php', 0, ''],
+        ['売上確定', '/sales/sales_confirm.php', (int)$count['sales_cnt'], '未確定'],
+        ['棚卸', '/stocktaking/stocktaking_input.php', (int)$count['stock_cnt'], '在庫0以下'],
+    ]],
+    'report' => ['name' => '管理業務', 'items' => [
+        ['発注明細表', '/report/order_list.php', 0, ''],
+        ['発注集計', '/report/order_summary.php', 0, ''],
+        ['納品明細表', '/report/delivery_list.php', 0, ''],
+        ['納品集計', '/report/delivery_summary.php', 0, ''],
+        ['返品明細表', '/report/return_goods_list.php', 0, ''],
+        ['返品集計', '/report/return_goods_summary.php', 0, ''],
+        ['売上明細表', '/report/sales_list.php', 0, ''],
+        ['売上集計', '/report/sales_summary.php', 0, ''],
+        ['棚卸調整一覧表', '/report/stocktaking_list.php', 0, ''],
+        ['卸業者別納品金額', '/report/supplier_summary.php', 0, ''],
+    ]],
+    'master' => ['name' => 'マスタ管理', 'items' => [
+        ['商品マスタ', '/master/product_list.php', 0, ''],
+        ['卸業者マスタ', '/master/supplier_list.php', 0, ''],
+        ['操作者マスタ', '/master/operator_list.php', 0, ''],
+    ]],
 ];
-$groups = menuGroups();
+$firstKey = array_key_first($groups);   // 最初に選ばれているジャンル（発注）
 
-$pageTitle = 'メニュー';
+$pageTitle  = 'メニュー';
+$pageScript = 'menu.js';
 require_once __DIR__ . '/common/header.php';
 ?>
-<h2 class="menu-h2">対応が必要なもの</h2>
-<div class="todo-tiles">
-  <?php foreach ($todos as [$genre, $title, $n, $linkLabel, $url]): ?>
-  <div class="card todo-tile <?= $n > 0 ? 'is-active' : '' ?>">
-    <small><?= h($genre) ?></small>
-    <div class="todo-main"><?= h($title) ?> <b><?= h($n) ?></b> 件</div>
-    <?php if ($url !== ''): ?><a href="<?= h($url) ?>"><?= h($linkLabel) ?> →</a><?php else: ?><span class="note">発注承認可の操作者が確定します</span><?php endif; ?>
+<?php // JS が無いときは全ジャンルを縦に並べて表示する。JS（menu.js）が動くと、左で選んだジャンルだけを右に出す ?>
+<div class="menu-layout" id="menuLayout">
+  <div class="menu-tabs" role="tablist" aria-orientation="vertical" aria-label="業務のジャンル">
+    <?php foreach ($groups as $key => $g):
+        $total = array_sum(array_column($g['items'], 2)); ?>
+    <button type="button" class="menu-tab" role="tab" id="menuTab-<?= h($key) ?>" data-key="<?= h($key) ?>"
+            aria-controls="menuPanel-<?= h($key) ?>" aria-selected="<?= $key === $firstKey ? 'true' : 'false' ?>">
+      <span><?= h($g['name']) ?></span>
+      <?php if ($total > 0): ?><span class="badge" title="確認が必要な件数"><?= h($total) ?></span><?php endif; ?>
+    </button>
+    <?php endforeach; ?>
   </div>
-  <?php endforeach; ?>
-</div>
-
-<div class="menu-grid">
-  <?php foreach ($groups as $key => $g): ?>
-  <section class="menu-section menu-section-<?= h($key) ?>" id="<?= h($key) ?>">
-    <h2 class="menu-h2"><?= h($g['name']) ?></h2>
-    <div class="menu-buttons <?= $g['items'][0]['desc'] === '' ? 'is-compact' : '' ?>">
-      <?php foreach ($g['items'] as $it): ?>
-      <a href="<?= h($it['url']) ?>" class="menu-button card">
-        <span class="menu-label"><?= h($it['label']) ?></span>
-        <?php if ($it['desc'] !== ''): ?><span class="menu-desc"><?= h($it['desc']) ?></span><?php endif; ?>
-      </a>
-      <?php endforeach; ?>
-    </div>
-  </section>
-  <?php endforeach; ?>
+  <div class="menu-panels">
+    <?php foreach ($groups as $key => $g): ?>
+    <section class="menu-panel" role="tabpanel" id="menuPanel-<?= h($key) ?>" aria-labelledby="menuTab-<?= h($key) ?>">
+      <h2><?= h($g['name']) ?></h2>
+      <div class="menu-buttons">
+        <?php foreach ($g['items'] as [$label, $url, $n, $badgeLabel]): ?>
+        <a href="<?= h($url) ?>" class="menu-button"><?= h($label) ?><?= badge($n, $badgeLabel) ?></a>
+        <?php endforeach; ?>
+      </div>
+    </section>
+    <?php endforeach; ?>
+  </div>
 </div>
 <?php require_once __DIR__ . '/common/footer.php'; ?>

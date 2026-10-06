@@ -1,8 +1,7 @@
 </main>
-</div>
-<script src="/js/common.js?v=8"></script>
+<script src="/js/common.js?v=7"></script>
 <?php if (isset($pageScript)): ?>
-<script src="/js/<?= h($pageScript) ?>?v=8"></script>
+<script src="/js/<?= h($pageScript) ?>?v=7"></script>
 <?php endif; ?>
 </body>
 </html>
