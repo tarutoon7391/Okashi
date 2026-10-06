@@ -97,6 +97,7 @@ $pageTitle = $isEdit ? '卸業者編集' : '卸業者登録';
 require_once __DIR__ . '/../common/header.php';
 ?>
 <form method="post">
+  <div class="card form-card">
   <div class="form-grid">
     <label for="supplierCode">卸業者コード <span class="req">必須</span></label>
     <?php if ($isEdit): ?>
@@ -118,9 +119,11 @@ require_once __DIR__ . '/../common/header.php';
     <label for="memo">補足メモ</label>
     <textarea id="memo" name="memo" rows="3"><?= h($supplier['memo']) ?></textarea>
   </div>
-  <div class="btn-area">
+  </div>
+  <div class="action-bar"><div class="bar-in">
+  <span class="bar-spacer"></span>
     <button type="submit" class="btn btn-primary">保存</button>
     <a href="/master/supplier_list.php" class="btn">一覧へ戻る</a>
-  </div>
+</div></div>
 </form>
 <?php require_once __DIR__ . '/../common/footer.php'; ?>

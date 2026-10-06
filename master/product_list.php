@@ -38,6 +38,11 @@ function photoVersion(string $photoPath): int
 
 $pageTitle = '商品一覧';
 require_once __DIR__ . '/../common/header.php';
+renderTabs([
+    ['href' => '/master/product_list.php',  'label' => '商品一覧'],
+    ['href' => '/master/supplier_list.php', 'label' => '卸業者一覧'],
+    ['href' => '/master/operator_list.php', 'label' => '操作者一覧'],
+]);
 ?>
 <form method="get" class="filter-form">
   <label>商品名 <input type="search" name="keyword" value="<?= h($keyword) ?>" placeholder="商品名・カナ・コード"></label>
@@ -54,6 +59,7 @@ require_once __DIR__ . '/../common/header.php';
 <div class="btn-area">
   <a href="/master/product_edit.php" class="btn btn-primary">新規登録</a>
 </div>
+<div class="card tbl-scroll">
 <table class="data-table">
   <thead>
     <tr><th>写真</th><th>商品コード</th><th>商品名（カナ）</th><th>規格</th><th>入数</th><th>定価</th><th>契約単価</th><th>契約卸</th><th>保存区分</th><th>賞味期限日数</th><th>在庫</th><th></th></tr>
@@ -84,5 +90,9 @@ require_once __DIR__ . '/../common/header.php';
     <?php endforeach; ?>
   </tbody>
 </table>
-<div class="btn-area"><a href="/menu.php" class="btn">メニューへ戻る</a></div>
+</div>
+<div class="action-bar"><div class="bar-in">
+  <span class="bar-spacer"></span>
+  <a href="/menu.php" class="btn">メニューへ戻る</a>
+</div></div>
 <?php require_once __DIR__ . '/../common/footer.php'; ?>

@@ -27,6 +27,7 @@ $pageTitle = '棚卸調整一覧表';
 require_once __DIR__ . '/../common/header.php';
 ?>
 <?php renderReportFilter($filter, ['supplier' => false, 'status' => false]); ?>
+<div class="card tbl-scroll">
 <table class="data-table">
   <thead>
     <tr><th>棚卸日</th><th>棚卸No</th><th>商品コード</th><th>商品名</th><th>帳簿数</th><th>実数</th><th>差異</th><th>差異の原因・理由</th><th>担当</th></tr>
@@ -51,5 +52,9 @@ require_once __DIR__ . '/../common/header.php';
     <tr><td colspan="6" class="num">差異合計</td><td class="num"><?= h(array_sum(array_column($rows, 'diff_qty'))) ?></td><td colspan="2"></td></tr>
   </tfoot>
 </table>
-<div class="btn-area"><a href="/menu.php" class="btn">メニューへ戻る</a></div>
+</div>
+<div class="action-bar"><div class="bar-in">
+  <span class="bar-spacer"></span>
+  <a href="/menu.php" class="btn">メニューへ戻る</a>
+</div></div>
 <?php require_once __DIR__ . '/../common/footer.php'; ?>

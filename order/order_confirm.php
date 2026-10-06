@@ -115,34 +115,62 @@ foreach ($slips as &$slip) {
 }
 unset($slip);
 
+$totalAmount = array_sum(array_column($slips, 'total'));
+$noMailCount = count(array_filter($slips, fn($s) => !$s['order_email']));
+
 $pageTitle = '発注確定';
 require_once __DIR__ . '/../common/header.php';
+renderTabs([
+    ['href' => '/order/order_input.php',   'label' => '① 発注入力'],
+    ['href' => '/order/order_confirm.php', 'label' => '② 発注確定'],
+    ['href' => '/order/order_print.php',   'label' => '③ 発注書'],
+]);
 ?>
+<div class="cards">
+  <?= statCard('未確定の伝票', h(count($slips)) . '枚') ?>
+  <?= statCard('未確定の金額', h(formatYen($totalAmount))) ?>
+  <?= statCard('メール未登録の卸業者', h($noMailCount) . '枚', $noMailCount > 0 ? 'warn' : '') ?>
+</div>
 <?php if (!$slips): ?>
-  <p>未確定の発注伝票はありません。</p>
+  <div class="card form-card"><p class="hint" style="margin:0">未確定の発注伝票はありません。<a href="/order/order_input.php">発注入力</a>で登録した伝票がここに出ます。</p></div>
+  <div class="action-bar"><div class="bar-in">
+    <span class="bar-spacer"></span>
+    <a href="/order/order_input.php" class="btn">発注入力へ</a>
+    <a href="/menu.php" class="btn">メニューへ戻る</a>
+  </div></div>
 <?php else: ?>
+<p class="hint">確定する発注伝票を選んでください。確定すると変更できず、卸業者へ発注書をメールで送ります。</p>
 <form method="post" data-confirm="チェックした発注伝票を確定します。確定後は変更できず、卸業者へ発注書をメールで送ります。よろしいですか？">
-  <table class="data-table">
-    <thead>
-      <tr><th><input type="checkbox" class="js-check-all" title="すべて選択"></th><th>伝票No</th><th>発注日</th><th>卸業者</th><th>明細</th><th>合計金額</th><th>発注先メール</th><th>起票者</th><th>状態</th><th></th></tr>
-    </thead>
-    <tbody>
-      <?php foreach ($slips as $slip): ?>
-      <tr>
-        <td><input type="checkbox" name="order_no[]" value="<?= h($slip['order_no']) ?>" class="js-check"></td>
-        <td class="num"><?= h($slip['order_no']) ?></td>
-        <td><?= h(formatDate($slip['order_date'])) ?></td>
-        <td><?= h($slip['supplier_code'] . ' ' . $slip['supplier_name']) ?></td>
-        <td>
-          <table class="inner-table">
+  <p class="note"><label><input type="checkbox" class="js-check-all"> すべての伝票を選択</label></p>
+  <?php foreach ($slips as $i => $slip): $qty = array_sum(array_column($slip['details'], 'order_qty')); ?>
+  <div class="card slip-card" data-n="<?= count($slip['details']) ?>" data-q="<?= h($qty) ?>" data-a="<?= h($slip['total']) ?>">
+    <label class="slip-head">
+      <input type="checkbox" name="order_no[]" value="<?= h($slip['order_no']) ?>" class="js-check" aria-label="伝票No.<?= h($slip['order_no']) ?>を選択">
+      <span class="slip-title">No.<?= h($slip['order_no']) ?>　<?= h($slip['supplier_name']) ?> <?= statusPill(0) ?>
+        <small><?= h(formatDate($slip['order_date'])) ?>・起票 <?= h($slip['created_name'] ?? $slip['created_by']) ?></small></span>
+      <span class="slip-sum">
+        <span><small>明細</small><b><?= count($slip['details']) ?>件</b></span>
+        <span><small>数量合計</small><b class="<?= $qty < 0 ? 'neg' : '' ?>"><?= h($qty) ?></b></span>
+        <span><small>合計金額</small><b class="<?= (int)$slip['total'] < 0 ? 'neg' : '' ?>"><?= h(formatYen($slip['total'])) ?></b></span>
+      </span>
+    </label>
+    <?php if (!$slip['order_email']): ?>
+      <div class="warn-box">⚠ この卸業者は発注先メールが未登録のため、発注書は送信されません（確定はできます）</div>
+    <?php endif; ?>
+    <details<?= $i === 0 ? ' open' : '' ?>>
+      <summary>明細を見る</summary>
+      <div class="tbl-scroll">
+        <table class="data-table compact">
+          <thead><tr><th>商品コード</th><th>商品名</th><th class="num">数量</th><th class="num">金額</th><th>発注時メモ</th></tr></thead>
+          <tbody>
             <?php foreach ($slip['details'] as $d): ?>
             <tr class="<?= minusClass($d['order_qty']) ?>">
               <td><?= h($d['product_code']) ?></td>
               <td><?= h($d['product_name'] . ' ' . $d['spec']) ?><?= storageBadge($d['storage_type']) ?>
                 <?php if ($d['ref_order_no'] !== null): ?>
-                  <small>（取消元 No.<?= h($d['ref_order_no'] . '-' . $d['ref_line_no']) ?>：発注<?= h($d['ref_order_qty']) ?>
+                  <br><small class="note">取消元 No.<?= h($d['ref_order_no'] . '-' . $d['ref_line_no']) ?>：発注<?= h($d['ref_order_qty']) ?>
                     ・取消済<?= h(-(int)$d['ref_cancel_qty']) ?>・納品<?= h($d['ref_delivered_qty']) ?>
-                    → 残<?= h((int)$d['ref_order_qty'] + (int)$d['ref_cancel_qty'] - (int)$d['ref_delivered_qty']) ?>）</small>
+                    → 残<?= h((int)$d['ref_order_qty'] + (int)$d['ref_cancel_qty'] - (int)$d['ref_delivered_qty']) ?></small>
                 <?php endif; ?>
               </td>
               <td class="num"><?= h($d['order_qty']) ?></td>
@@ -150,21 +178,29 @@ require_once __DIR__ . '/../common/header.php';
               <td><?= h($d['memo']) ?></td>
             </tr>
             <?php endforeach; ?>
-          </table>
-        </td>
-        <td class="num <?= minusClass($slip['total']) ?>"><?= h(formatYen($slip['total'])) ?></td>
-        <td><?= $slip['order_email'] ? h($slip['order_email']) : '<span class="error-text">未登録（送信されません）</span>' ?></td>
-        <td><?= h($slip['created_name'] ?? $slip['created_by']) ?></td>
-        <?= statusCell(0) ?>
-        <td><button type="submit" form="deleteForm<?= h($slip['order_no']) ?>" class="btn btn-small">削除</button></td>
-      </tr>
-      <?php endforeach; ?>
-    </tbody>
-  </table>
-  <div class="btn-area">
-    <button type="submit" class="btn btn-danger">確定</button>
-    <a href="/menu.php" class="btn">メニューへ戻る</a>
+          </tbody>
+        </table>
+      </div>
+    </details>
+    <div class="slip-foot">
+      <span class="note">発注先メール：<?= $slip['order_email'] ? h($slip['order_email']) : '<span class="error-text">未登録</span>' ?></span>
+      <span style="margin-left:auto"></span>
+      <button type="submit" form="deleteForm<?= h($slip['order_no']) ?>" class="btn btn-small">この伝票を削除</button>
+    </div>
   </div>
+  <?php endforeach; ?>
+
+  <div class="action-bar"><div class="bar-in">
+    <div class="bar-sum">
+      <span><small>選択</small><b id="selCount">0</b>枚</span>
+      <span><small>明細</small><b id="selLines">0件</b></span>
+      <span><small>数量</small><b id="selQty">0</b></span>
+      <span><small>金額</small><b id="selAmount">¥0</b></span>
+    </div>
+    <button type="submit" class="btn btn-danger" id="btnConfirm" disabled>選択した伝票を確定する</button>
+    <a href="/order/order_input.php" class="btn">発注入力へ</a>
+    <a href="/menu.php" class="btn">メニューへ戻る</a>
+  </div></div>
 </form>
 <?php // 削除ボタン用のフォーム（確定フォームの中に form は置けないので外に置き、ボタンの form 属性で指定する） ?>
 <?php foreach ($slips as $slip): ?>
@@ -173,6 +209,5 @@ require_once __DIR__ . '/../common/header.php';
 </form>
 <?php endforeach; ?>
 <?php endif; ?>
-<h2>確定済みの発注書</h2>
-<p><a href="/order/order_print.php">最近確定した発注書の一覧へ</a></p>
+<p class="page-links">確定済みの発注書は <a href="/order/order_print.php">③ 発注書</a> から確認できます。</p>
 <?php require_once __DIR__ . '/../common/footer.php'; ?>

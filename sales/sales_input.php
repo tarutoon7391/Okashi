@@ -128,111 +128,93 @@ foreach ($day as $r) {
     }
 }
 
-$pageTitle = '売上入力';
-require_once __DIR__ . '/../common/header.php';
-?>
-<form method="get" class="filter-form">
-  <label>売上日 <input type="date" name="sales_date" value="<?= h($salesDate) ?>" onchange="this.form.submit()"></label>
-  <noscript><button type="submit" class="btn">表示</button></noscript>
-</form>
+// 集計タイル用：登録済みの件数・金額、在庫0の商品数
+$registeredCount  = count($day);
+$registeredAmount = 0;
+foreach ($day as $code => $r) {
+    foreach ($products as $p) {
+        if ($p['product_code'] === $code) {
+            $registeredAmount += ((int)$r['confirmed_qty'] + (int)$r['unconfirmed_qty']) * (int)$p['list_price'];
+            break;
+        }
+    }
+}
+$zeroStockCount = count(array_filter($products, fn($p) => (int)$p['stock_qty'] <= 0));
 
-<p>
-  <?= h(formatDate($salesDate)) ?> の状態：
-  <?php if (!$day): ?>
-    未登録
-  <?php elseif ($unconfirmedCount > 0): ?>
-    <span class="status-unconfirmed">未確定あり（<?= h($unconfirmedCount) ?>商品）</span>
-    <?php if ($confirmedCount > 0): ?>／<span class="status-confirmed">確定済（<?= h($confirmedCount) ?>商品）</span><?php endif; ?>
-    … 売上確定で在庫に反映してください
-  <?php else: ?>
-    <span class="status-confirmed">すべて確定済（<?= h($confirmedCount) ?>商品）</span>
-  <?php endif; ?>
-</p>
+$pageTitle  = '売上入力';
+$pageScript = 'sales_input.js';
+require_once __DIR__ . '/../common/header.php';
+renderTabs([
+    ['href' => '/sales/sales_input.php',   'label' => '① 売上入力・確認'],
+    ['href' => '/sales/sales_confirm.php', 'label' => '② 売上確定'],
+]);
+?>
+<div class="cards">
+  <?php
+  if (!$day) {
+      $state = '<span class="st st-none">未登録</span>';
+  } elseif ($unconfirmedCount > 0) {
+      $state = statusPill(0) . ($confirmedCount > 0 ? ' <small class="note">一部確定済</small>' : '');
+  } else {
+      $state = statusPill(1);
+  }
+  echo statCard('この日の状態', $state);
+  echo statCard('登録済みの件数', h($registeredCount) . '件');
+  echo statCard('登録済みの金額', h(formatYen($registeredAmount)));
+  echo statCard('在庫が0の商品', h($zeroStockCount) . '商品', $zeroStockCount > 0 ? 'warn' : '');
+  ?>
+</div>
+
+<form method="get" class="filter-form">
+  <label for="salesDate">売上日</label>
+  <input type="date" id="salesDate" name="sales_date" value="<?= h($salesDate) ?>" onchange="this.form.submit()">
+  <noscript><button type="submit" class="btn">表示</button></noscript>
+  <span class="hint">登録済みの日は数量が入っています。書き換えると上書きされます。売上金額＝定価×売上数</span>
+</form>
 
 <form method="post" data-confirm="<?= h(formatDate($salesDate)) ?> の売上を登録します。よろしいですか？">
   <input type="hidden" name="sales_date" value="<?= h($salesDate) ?>">
-  <p class="note">売れた数を入力してください（空欄の商品は登録しません）。登録済みの日を開くと、その数量が入っています。書き換えると上書きになります。売上金額は 定価 × 売上数 です。</p>
+  <div class="card tbl-scroll">
   <table class="data-table">
     <thead>
-      <tr><th>商品コード</th><th>商品名</th><th>規格</th><th>入数</th><th>定価</th><th>現在庫</th><th>登録済（確定／未確定）</th><th>状態</th><th>売上数</th><th>売上金額</th></tr>
+      <tr><th>商品コード</th><th>商品名</th><th>規格</th><th class="num">入数</th><th class="num">定価</th><th class="num">現在庫</th><th>状態</th><th class="num">売上数</th><th class="num">売上金額</th></tr>
     </thead>
     <tbody>
       <?php
-      $totalQty    = 0;
-      $totalAmount = 0;
       foreach ($products as $p):
           $cur = $day[$p['product_code']] ?? null;
           $registered = $cur ? (int)$cur['confirmed_qty'] + (int)$cur['unconfirmed_qty'] : null;
           $value = $qtyInput[$p['product_code']] ?? ($registered ?? '');
-          $qty   = toIntOrNull($value);
-          $amount = $qty === null ? null : $qty * (int)$p['list_price'];
-          $totalQty    += $qty ?? 0;
-          $totalAmount += $amount ?? 0; ?>
-      <tr class="js-sales-row <?= (int)$p['stock_qty'] <= 0 ? 'stock-warning' : '' ?>" data-price="<?= h($p['list_price']) ?>">
+          // 状態：未登録 / 未確定 / 確定済。JS が入力中（登録済みと違う値）に切り替える
+          $status = $cur === null ? 'none' : ($cur['unconfirmed_no'] === null ? 'done' : 'pending'); ?>
+      <tr class="js-sales-row <?= (int)$p['stock_qty'] <= 0 ? 'stock-warning' : '' ?>" data-price="<?= h($p['list_price']) ?>"
+          data-registered="<?= h($registered ?? '') ?>" data-status="<?= h($status) ?>">
         <td><?= h($p['product_code']) ?></td>
         <td><?= h($p['product_name']) ?><?= storageBadge($p['storage_type']) ?></td>
         <td><?= h($p['spec']) ?></td>
         <td class="num"><?= h($p['pack_qty']) ?></td>
         <td class="num"><?= h(formatYen($p['list_price'])) ?></td>
-        <td class="num"><?= h($p['stock_qty']) ?></td>
-        <td class="num">
-          <?php if ($cur): ?>
-            <?= h($cur['confirmed_qty']) ?> ／ <span class="<?= (int)$cur['unconfirmed_qty'] !== 0 ? 'status-unconfirmed' : '' ?>"><?= h($cur['unconfirmed_qty']) ?></span>
-          <?php endif; ?>
-        </td>
-        <?php if ($cur === null): ?>
-          <td>未登録</td>
-        <?php else: ?>
-          <?= statusCell($cur['unconfirmed_no'] === null ? 1 : 0) ?>
-        <?php endif; ?>
-        <td><input type="number" name="sales_qty[<?= h($p['product_code']) ?>]" class="js-sales-qty" value="<?= h($value) ?>" step="1"></td>
-        <td class="num js-sales-amount <?= $amount !== null ? minusClass($amount) : '' ?>"><?= $amount === null ? '' : h(formatYen($amount)) ?></td>
+        <?= stockCell($p['stock_qty']) ?>
+        <td class="js-sales-state"></td>
+        <td class="num"><input type="number" name="sales_qty[<?= h($p['product_code']) ?>]" class="js-sales-qty" value="<?= h($value) ?>" step="1"
+            aria-label="<?= h($p['product_name'] . ' ' . $p['spec']) ?>の売上数"></td>
+        <td class="num js-sales-amount"></td>
       </tr>
       <?php endforeach; ?>
     </tbody>
-    <tfoot>
-      <tr>
-        <td colspan="8" class="num">合計</td>
-        <td class="num" id="salesTotalQty"><?= h($totalQty) ?></td>
-        <td class="num" id="salesTotalAmount"><?= h(formatYen($totalAmount)) ?></td>
-      </tr>
-    </tfoot>
   </table>
-  <div class="btn-area">
+  </div>
+  <p class="note">※ 薄い赤の行は在庫が0の商品です。売ると在庫がマイナスになるため、確定時に警告が出ます。<br>
+    確定済みの日の数量を書き換えると、差分が訂正行として登録されます（確定済みの行は変わりません）。</p>
+
+  <div class="action-bar"><div class="bar-in">
+    <div class="bar-sum">
+      <span><small>売上数合計</small><b id="salesTotalQty">0</b></span>
+      <span><small>金額合計</small><b id="salesTotalAmount">¥0</b></span>
+    </div>
     <button type="submit" class="btn btn-primary">登録</button>
     <a href="/sales/sales_confirm.php" class="btn">売上確定へ</a>
     <a href="/menu.php" class="btn">メニューへ戻る</a>
-  </div>
+  </div></div>
 </form>
-<script>
-// 売上数を入れると 売上金額（定価 × 売上数）と合計をその場で計算する（登録時の金額はサーバ側で計算し直す）
-(() => {
-    const yen = (n) => (n < 0 ? '-' : '') + '¥' + Math.abs(n).toLocaleString('ja-JP');   // formatYen() と同じ形
-    const rows = document.querySelectorAll('.js-sales-row');
-    function update() {
-        let totalQty = 0;
-        let totalAmount = 0;
-        rows.forEach((row) => {
-            const input = row.querySelector('.js-sales-qty');
-            const cell = row.querySelector('.js-sales-amount');
-            const v = input.value.trim();
-            if (v === '' || !/^-?\d+$/.test(v)) {
-                cell.textContent = '';
-                cell.classList.remove('qty-minus');
-                return;
-            }
-            const qty = parseInt(v, 10);
-            const amount = qty * Number(row.dataset.price);
-            cell.textContent = yen(amount);
-            cell.classList.toggle('qty-minus', amount < 0);
-            totalQty += qty;
-            totalAmount += amount;
-        });
-        document.getElementById('salesTotalQty').textContent = String(totalQty);
-        document.getElementById('salesTotalAmount').textContent = yen(totalAmount);
-    }
-    rows.forEach((row) => row.querySelector('.js-sales-qty').addEventListener('input', update));
-    update();
-})();
-</script>
 <?php require_once __DIR__ . '/../common/footer.php'; ?>

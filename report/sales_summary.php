@@ -28,6 +28,7 @@ $pageTitle = '売上集計';
 require_once __DIR__ . '/../common/header.php';
 ?>
 <?php renderReportFilter($filter, ['supplier' => false]); ?>
+<div class="card tbl-scroll">
 <table class="data-table">
   <thead>
     <tr><th>商品コード</th><th>商品名</th><th>規格</th><th>定価</th><th>売上日数</th><th>売上数合計</th><th>売上金額合計</th></tr>
@@ -52,5 +53,9 @@ require_once __DIR__ . '/../common/header.php';
       <td class="num"><?= h(formatYen(array_sum(array_column($rows, 'amount')))) ?></td></tr>
   </tfoot>
 </table>
-<div class="btn-area"><a href="/menu.php" class="btn">メニューへ戻る</a></div>
+</div>
+<div class="action-bar"><div class="bar-in">
+  <span class="bar-spacer"></span>
+  <a href="/menu.php" class="btn">メニューへ戻る</a>
+</div></div>
 <?php require_once __DIR__ . '/../common/footer.php'; ?>

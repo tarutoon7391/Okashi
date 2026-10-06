@@ -159,8 +159,13 @@ $list = $supplierCode !== '' ? getUndeliveredList(['supplier_code' => $supplierC
 $pageTitle  = '納品入力';
 $pageScript = 'delivery_input.js';
 require_once __DIR__ . '/../common/header.php';
+renderTabs([
+    ['href' => '/delivery/delivery_input.php',          'label' => '① 納品入力'],
+    ['href' => '/delivery/delivery_confirm.php',        'label' => '② 納品確定'],
+    ['href' => '/return_goods/return_goods_input.php',  'label' => '返品伝票入力'],
+    ['href' => '/delivery/undelivered_print.php',       'label' => '未納品一覧表'],
+]);
 ?>
-<h2>① 卸業者を選ぶ</h2>
 <form method="get" class="filter-form">
   <label>卸業者
     <select name="supplier_code" onchange="this.form.submit()">
@@ -175,20 +180,22 @@ require_once __DIR__ . '/../common/header.php';
 </form>
 
 <?php if ($supplierCode !== ''): ?>
-<h2>② 未納品一覧<?= $withDelivered ? '（納品済みの訂正を含む）' : '' ?> ／ ③ 納品された商品をチェック</h2>
+<h2>未納品一覧<?= $withDelivered ? '（納品済みの訂正を含む）' : '' ?></h2>
 <?php if ($withDelivered): ?>
   <p class="note">納品済みの訂正：数量をマイナスで入力すると、納品済み数を減らす訂正になります（納品済み数まで）。未確定の伝票の間違いは、納品確定画面で伝票ごと削除できます。</p>
 <?php endif; ?>
 <?php if (!$list): ?>
-  <p>この卸業者宛の未納品はありません。</p>
+  <p class="hint">この卸業者宛の未納品はありません。</p>
 <?php else: ?>
 <form method="post" data-confirm="チェックした明細で納品伝票（未確定）を登録します。よろしいですか？">
   <input type="hidden" name="supplier_code" value="<?= h($supplierCode) ?>">
   <input type="hidden" name="with_delivered" value="<?= $withDelivered ? '1' : '' ?>">
-  <div class="form-grid">
+  <div class="filter-form">
     <label for="deliveryDate">納品日</label>
     <input type="date" id="deliveryDate" name="delivery_date" value="<?= h($deliveryDate) ?>" required>
+    <span class="hint">納品された明細にチェックを入れ、納品数量を確認してください。納品金額＝契約単価×納品数量（チェックしていない行は合計に入りません）</span>
   </div>
+  <div class="card tbl-scroll">
   <table class="data-table delivery-input-table">
     <thead>
       <tr><th><input type="checkbox" class="js-check-all" title="すべて選択"></th><th>発注No</th><th>発注日</th><th>商品</th><th>入数</th><th>発注数</th><th>取消</th><th>納品済</th><th>残数</th><th>契約単価</th><th>納品数量</th><th>納品金額</th><th>メモ</th></tr>
@@ -219,20 +226,19 @@ require_once __DIR__ . '/../common/header.php';
       </tr>
       <?php endforeach; ?>
     </tbody>
-    <tfoot>
-      <tr><td colspan="11" class="num">チェックした行の合計</td><td class="num" id="deliveryTotal"></td><td></td></tr>
-    </tfoot>
   </table>
-  <p class="note">納品金額は 契約単価×納品数量。チェックしていない行の金額は参考表示です（合計には入りません）。</p>
-  <?php if ($overKeys || $allowOver): ?>
-  <p class="flash-warning"><label><input type="checkbox" name="allow_over" value="1" <?= $allowOver ? 'checked' : '' ?>> 残数超過を承知で登録</label>（対象：<?= h(implode('、', $overKeys ?: ['なし'])) ?>）</p>
-  <?php endif; ?>
-  <div class="btn-area">
-    <button type="submit" class="btn btn-primary">登録</button>
-    <a href="/menu.php" class="btn">メニューへ戻る</a>
   </div>
+  <?php if ($overKeys || $allowOver): ?>
+  <div class="warn-box">⚠ 残数を超える納品数量があります：<?= h(implode('、', $overKeys ?: ['なし'])) ?>　
+    <label><input type="checkbox" name="allow_over" value="1" <?= $allowOver ? 'checked' : '' ?>> 残数超過を承知で登録</label></div>
+  <?php endif; ?>
+  <div class="action-bar"><div class="bar-in">
+    <div class="bar-sum"><span><small>チェックした行の合計</small><b id="deliveryTotal">¥0</b></span></div>
+    <button type="submit" class="btn btn-primary">登録</button>
+    <a href="/delivery/delivery_confirm.php" class="btn">納品確定へ</a>
+    <a href="/menu.php" class="btn">メニューへ戻る</a>
+</div></div>
 </form>
 <?php endif; ?>
 <?php endif; ?>
-<p><a href="/delivery/delivery_confirm.php">納品確定へ</a> ／ <a href="/delivery/undelivered_print.php">未納品一覧表へ</a></p>
 <?php require_once __DIR__ . '/../common/footer.php'; ?>

@@ -208,6 +208,7 @@ $pageTitle = $isEdit ? '商品編集' : '商品登録';
 require_once __DIR__ . '/../common/header.php';
 ?>
 <form method="post" enctype="multipart/form-data">
+  <div class="card form-card">
   <div class="form-grid">
     <label for="productCode">商品コード <span class="req">必須</span></label>
     <?php if ($isEdit): ?>
@@ -259,9 +260,11 @@ require_once __DIR__ . '/../common/header.php';
     <label for="memo">補足メモ</label>
     <textarea id="memo" name="memo" rows="3"><?= h($product['memo']) ?></textarea>
   </div>
-  <div class="btn-area">
+  </div>
+  <div class="action-bar"><div class="bar-in">
+  <span class="bar-spacer"></span>
     <button type="submit" class="btn btn-primary">保存</button>
     <a href="/master/product_list.php" class="btn">一覧へ戻る</a>
-  </div>
+</div></div>
 </form>
 <?php require_once __DIR__ . '/../common/footer.php'; ?>

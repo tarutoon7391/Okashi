@@ -155,6 +155,12 @@ $list = $supplierCode !== '' ? getReturnableDeliveryDetails($supplierCode) : [];
 
 $pageTitle = '返品伝票入力';
 require_once __DIR__ . '/../common/header.php';
+renderTabs([
+    ['href' => '/delivery/delivery_input.php',          'label' => '① 納品入力'],
+    ['href' => '/delivery/delivery_confirm.php',        'label' => '② 納品確定'],
+    ['href' => '/return_goods/return_goods_input.php',  'label' => '返品伝票入力'],
+    ['href' => '/delivery/undelivered_print.php',       'label' => '未納品一覧表'],
+]);
 ?>
 <form method="get" class="filter-form">
   <label>卸業者
@@ -170,16 +176,17 @@ require_once __DIR__ . '/../common/header.php';
 
 <?php if ($supplierCode !== ''): ?>
 <?php if (!$list): ?>
-  <p>この卸業者の確定済み納品で、返品できるものはありません。</p>
+  <p class="hint">この卸業者の確定済み納品で、返品できるものはありません。</p>
 <?php else: ?>
 <form method="post" data-confirm="入力した内容で返品伝票（未確定）を登録します。よろしいですか？">
   <input type="hidden" name="supplier_code" value="<?= h($supplierCode) ?>">
-  <div class="form-grid">
+  <div class="filter-form">
     <label for="returnDate">返品日</label>
     <input type="date" id="returnDate" name="delivery_date" value="<?= h($returnDate) ?>" required>
+    <span class="hint">返品する行だけ返品数（プラスで入力）と理由を入れてください。伝票にはマイナス数量で記録されます。
+      「発注明細の返品可能数」は同じ発注明細の納品すべてで共通です（返品済み・訂正済みの分を差し引いた数）。</span>
   </div>
-  <p class="note">返品する行だけ返品数（プラスで入力）と理由を入れてください。伝票にはマイナス数量で記録されます。<br>
-    「発注明細の返品可能数」は同じ発注明細の納品すべてで共通です（返品済み・訂正済みの分を差し引いた数）。</p>
+  <div class="card tbl-scroll">
   <table class="data-table">
     <thead>
       <tr><th>納品日</th><th>伝票No</th><th>発注No</th><th>発注日</th><th>商品</th><th>入数</th><th>納品数</th><th>発注明細の返品済</th><th>発注明細の返品可能数</th><th>返品数</th><th>返品理由</th></tr>
@@ -202,12 +209,14 @@ require_once __DIR__ . '/../common/header.php';
       <?php endforeach; ?>
     </tbody>
   </table>
-  <div class="btn-area">
-    <button type="submit" class="btn btn-primary">登録</button>
-    <a href="/menu.php" class="btn">メニューへ戻る</a>
   </div>
+  <div class="action-bar"><div class="bar-in">
+  <span class="bar-spacer"></span>
+    <button type="submit" class="btn btn-primary">登録</button>
+    <a href="/delivery/delivery_confirm.php" class="btn">納品確定へ</a>
+    <a href="/menu.php" class="btn">メニューへ戻る</a>
+</div></div>
 </form>
 <?php endif; ?>
 <?php endif; ?>
-<p><a href="/delivery/delivery_confirm.php">納品確定へ（返品伝票もここで確定）</a></p>
 <?php require_once __DIR__ . '/../common/footer.php'; ?>

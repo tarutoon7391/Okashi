@@ -37,6 +37,7 @@ $pageTitle = '返品集計';
 require_once __DIR__ . '/../common/header.php';
 ?>
 <?php renderReportFilter($filter); ?>
+<div class="card tbl-scroll">
 <table class="data-table">
   <thead>
     <tr><th>商品コード</th><th>商品名</th><th>規格</th><th>明細数</th><th>返品数合計</th><th>返品金額合計</th></tr>
@@ -68,5 +69,9 @@ require_once __DIR__ . '/../common/header.php';
     <tr><td colspan="4" class="num">合計</td><td class="num"><?= h($grandQty) ?></td><td class="num"><?= h(formatYen($grandAmount)) ?></td></tr>
   </tfoot>
 </table>
-<div class="btn-area"><a href="/menu.php" class="btn">メニューへ戻る</a></div>
+</div>
+<div class="action-bar"><div class="bar-in">
+  <span class="bar-spacer"></span>
+  <a href="/menu.php" class="btn">メニューへ戻る</a>
+</div></div>
 <?php require_once __DIR__ . '/../common/footer.php'; ?>

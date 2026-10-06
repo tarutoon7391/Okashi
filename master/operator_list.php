@@ -16,6 +16,11 @@ $isApprover = $me['can_approve_order'] === 1;
 
 $pageTitle = '操作者一覧';
 require_once __DIR__ . '/../common/header.php';
+renderTabs([
+    ['href' => '/master/product_list.php',  'label' => '商品一覧'],
+    ['href' => '/master/supplier_list.php', 'label' => '卸業者一覧'],
+    ['href' => '/master/operator_list.php', 'label' => '操作者一覧'],
+]);
 ?>
 <?php if ($isApprover): ?>
 <div class="btn-area">
@@ -24,6 +29,7 @@ require_once __DIR__ . '/../common/header.php';
 <?php else: ?>
 <p class="note">操作者の新規登録・削除、他の操作者の編集、パスワード・権限の設定は、発注承認可の操作者だけが行えます（質問No.5）。自分の操作者名・メールアドレスは変更できます。</p>
 <?php endif; ?>
+<div class="card tbl-scroll">
 <table class="data-table">
   <thead>
     <tr><th>操作者コード</th><th>操作者名</th><th>メールアドレス</th><th>発注承認</th><th>更新日時</th><th></th></tr>
@@ -51,5 +57,9 @@ require_once __DIR__ . '/../common/header.php';
     <?php endforeach; ?>
   </tbody>
 </table>
-<div class="btn-area"><a href="/menu.php" class="btn">メニューへ戻る</a></div>
+</div>
+<div class="action-bar"><div class="bar-in">
+  <span class="bar-spacer"></span>
+  <a href="/menu.php" class="btn">メニューへ戻る</a>
+</div></div>
 <?php require_once __DIR__ . '/../common/footer.php'; ?>

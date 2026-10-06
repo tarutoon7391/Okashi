@@ -141,6 +141,7 @@ $pageTitle = $isEdit ? '操作者編集' : '操作者登録';
 require_once __DIR__ . '/../common/header.php';
 ?>
 <form method="post" autocomplete="off">
+  <div class="card form-card">
   <div class="form-grid">
     <label for="operatorCode">操作者コード <span class="req">必須</span></label>
     <?php if ($isEdit): ?>
@@ -168,9 +169,11 @@ require_once __DIR__ . '/../common/header.php';
     <div><?= (int)$operator['can_approve_order'] === 1 ? '可' : '不可' ?>（変更は発注承認可の操作者が行います）</div>
     <?php endif; ?>
   </div>
-  <div class="btn-area">
+  </div>
+  <div class="action-bar"><div class="bar-in">
+  <span class="bar-spacer"></span>
     <button type="submit" class="btn btn-primary">保存</button>
     <a href="/master/operator_list.php" class="btn">一覧へ戻る</a>
-  </div>
+</div></div>
 </form>
 <?php require_once __DIR__ . '/../common/footer.php'; ?>

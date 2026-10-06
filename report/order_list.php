@@ -44,6 +44,7 @@ $pageTitle = '発注明細表';
 require_once __DIR__ . '/../common/header.php';
 ?>
 <?php renderReportFilter($filter); ?>
+<div class="card tbl-scroll">
 <table class="data-table">
   <thead>
     <tr><th>発注日</th><th>伝票No</th><th>商品コード</th><th>商品名</th><th>数量</th><th>取消済数</th><th>契約単価</th><th>納品金額</th><th>発注時メモ</th><th>起票者</th><th>状態</th></tr>
@@ -81,5 +82,9 @@ require_once __DIR__ . '/../common/header.php';
     <tr><td colspan="4" class="num">合計</td><td class="num"><?= h($grandQty) ?></td><td></td><td></td><td class="num"><?= h(formatYen($grandAmount)) ?></td><td colspan="3"></td></tr>
   </tfoot>
 </table>
-<div class="btn-area"><a href="/menu.php" class="btn">メニューへ戻る</a></div>
+</div>
+<div class="action-bar"><div class="bar-in">
+  <span class="bar-spacer"></span>
+  <a href="/menu.php" class="btn">メニューへ戻る</a>
+</div></div>
 <?php require_once __DIR__ . '/../common/footer.php'; ?>

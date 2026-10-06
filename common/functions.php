@@ -110,7 +110,43 @@ function minusClass($qty): string
 // 確定状態のセル（未確定は黄色、確定済は緑）。h() 済みのHTMLを返す
 function statusCell($isConfirmed): string
 {
+    return '<td>' . statusPill($isConfirmed) . '</td>';
+}
+
+// 確定状態のピル（丸いラベル）。セルの外（カードの見出しなど）で使う。h() 済みのHTMLを返す
+function statusPill($isConfirmed): string
+{
     return (int)$isConfirmed === 1
-        ? '<td class="status-confirmed">確定済</td>'
-        : '<td class="status-unconfirmed">未確定</td>';
+        ? '<span class="st status-confirmed">確定済</span>'
+        : '<span class="st status-unconfirmed">未確定</span>';
+}
+
+// 在庫数のセル。0 以下なら「在庫なし」ピル、それ以外は数字（売上入力・棚卸・商品一覧で共通）
+function stockCell($qty): string
+{
+    $qty = (int)$qty;
+    if ($qty <= 0) {
+        return '<td class="num"><span class="st st-zero">' . ($qty === 0 ? '在庫なし' : h($qty)) . '</span></td>';
+    }
+    return '<td class="num">' . h($qty) . '</td>';
+}
+
+// 画面上部の集計タイル（.cards の中に並べる）。$tone は '' / 'warn' / 'bad' / 'ok'
+function statCard(string $label, string $valueHtml, string $tone = '', string $id = ''): string
+{
+    $idAttr = $id !== '' ? ' id="' . h($id) . '"' : '';
+    return '<div class="card stat' . ($tone !== '' ? ' ' . h($tone) : '') . '"><small>' . h($label) . '</small><strong' . $idAttr . '>' . $valueHtml . '</strong></div>';
+}
+
+// 画面内タブ（同じ業務の画面を行き来する）。$items = [['href' => '/sales/sales_input.php', 'label' => '① 売上入力'], ...]
+// 今の画面（REQUEST_URI のパスが一致）に aria-current を付ける
+function renderTabs(array $items): void
+{
+    $self = strtok($_SERVER['REQUEST_URI'], '?');
+    echo '<nav class="tabs" aria-label="画面の切り替え">';
+    foreach ($items as $it) {
+        $current = $it['href'] === $self ? ' aria-current="page"' : '';
+        echo '<a class="tab" href="' . h($it['href']) . '"' . $current . '>' . h($it['label']) . '</a>';
+    }
+    echo '</nav>';
 }

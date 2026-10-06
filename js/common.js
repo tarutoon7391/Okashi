@@ -53,6 +53,58 @@ document.addEventListener('change', (e) => {
     document.dispatchEvent(new Event('check-all'));
 });
 
+// 画面共通：画面下の固定ボタンバー（.action-bar）がある画面は本文の下に余白を取る
+if (document.querySelector('.action-bar')) {
+    document.body.classList.add('has-bar');
+}
+
+// 画面共通：伝票カード（.slip-card）の選択。チェックした枚数・件数・数量・金額を
+// 固定バーの #selCount / #selLines / #selQty / #selAmount に出し、未選択なら #btnConfirm を押せなくする
+// カードには data-n（明細件数）・data-q（数量合計）・data-a（金額合計）を付けておく
+function updateSlipSelection() {
+    const cards = document.querySelectorAll('.slip-card');
+    if (!cards.length) {
+        return;
+    }
+    let count = 0;
+    let lines = 0;
+    let qty = 0;
+    let amount = 0;
+    cards.forEach((card) => {
+        const check = card.querySelector('.js-check');
+        const on = !!(check && check.checked);
+        card.classList.toggle('sel', on);
+        if (on) {
+            count++;
+            lines  += Number(card.dataset.n || 0);
+            qty    += Number(card.dataset.q || 0);
+            amount += Number(card.dataset.a || 0);
+        }
+    });
+    const set = (id, text, neg) => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.textContent = text;
+            el.classList.toggle('neg', !!neg);
+        }
+    };
+    set('selCount', String(count));
+    set('selLines', lines + '件');
+    set('selQty', String(qty), qty < 0);
+    set('selAmount', formatYen(amount), amount < 0);
+    const btn = document.getElementById('btnConfirm');
+    if (btn) {
+        btn.disabled = count === 0;
+    }
+}
+document.addEventListener('change', (e) => {
+    if (e.target.classList.contains('js-check') || e.target.classList.contains('js-check-all')) {
+        updateSlipSelection();
+    }
+});
+document.addEventListener('check-all', updateSlipSelection);
+updateSlipSelection();
+
 // 画面共通：data-confirm 属性を付けたフォームは送信前に確認する
 document.addEventListener('submit', (e) => {
     const msg = e.target.dataset.confirm;

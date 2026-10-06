@@ -54,7 +54,7 @@ if (isset($_GET['pdf'])) {
     $html = '<h1 style="text-align:center;font-size:16pt;">未納品一覧表</h1>'
           . '<p>' . h($cond) . '　出力日時：' . h(date('Y/m/d H:i')) . '</p>';
     if (!$groups) {
-        $html .= '<p>未納品はありません。</p>';
+        $html .= '<p class="hint">未納品はありません。</p>';
     }
     foreach ($groups as $code => $g) {
         $html .= '<h3>' . h($code . ' ' . $g['name']) . '</h3>'
@@ -83,6 +83,12 @@ if (isset($_GET['pdf'])) {
 $suppliers = getSupplierOptions();
 $pageTitle = '未納品一覧表';
 require_once __DIR__ . '/../common/header.php';
+renderTabs([
+    ['href' => '/delivery/delivery_input.php',          'label' => '① 納品入力'],
+    ['href' => '/delivery/delivery_confirm.php',        'label' => '② 納品確定'],
+    ['href' => '/return_goods/return_goods_input.php',  'label' => '返品伝票入力'],
+    ['href' => '/delivery/undelivered_print.php',       'label' => '未納品一覧表'],
+]);
 ?>
 <form method="get" class="filter-form">
   <label>卸業者
@@ -101,10 +107,11 @@ require_once __DIR__ . '/../common/header.php';
 
 <p class="note">納品済・残数量は確定済みの納品で計算しています。「未確定納品」は納品入力済みで納品確定がまだの数量です（納品確定すると納品済に入ります）。</p>
 <?php if (!$groups): ?>
-  <p>未納品はありません。</p>
+  <p class="hint">未納品はありません。</p>
 <?php endif; ?>
 <?php foreach ($groups as $code => $g): ?>
 <h2><?= h($code . ' ' . $g['name']) ?>（<?= count($g['rows']) ?>件）</h2>
+<div class="card tbl-scroll">
 <table class="data-table">
   <thead>
     <tr><th>発注No</th><th>発注日</th><th>商品</th><th>入数</th><th>発注数</th><th>取消</th><th>納品済</th><th>未確定納品</th><th>残数量</th><th>発注時メモ</th></tr>
@@ -126,10 +133,12 @@ require_once __DIR__ . '/../common/header.php';
     <?php endforeach; ?>
   </tbody>
 </table>
+</div>
 <?php endforeach; ?>
-<div class="btn-area">
+<div class="action-bar"><div class="bar-in">
+  <span class="bar-spacer"></span>
   <a href="/delivery/delivery_input.php" class="btn btn-primary">納品入力へ</a>
   <a href="/delivery/delivery_confirm.php" class="btn">納品確定へ戻る</a>
   <a href="/menu.php" class="btn">メニューへ戻る</a>
-</div>
+</div></div>
 <?php require_once __DIR__ . '/../common/footer.php'; ?>

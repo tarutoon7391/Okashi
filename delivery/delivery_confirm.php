@@ -96,49 +96,85 @@ foreach ($slips as &$slip) {
 }
 unset($slip);
 
+$totalAmount = array_sum(array_column($slips, 'total'));
+$returnCount = count(array_filter($slips, fn($s) => (int)$s['is_return'] === 1));
+
 $pageTitle = '納品確定';
 require_once __DIR__ . '/../common/header.php';
+renderTabs([
+    ['href' => '/delivery/delivery_input.php',          'label' => '① 納品入力'],
+    ['href' => '/delivery/delivery_confirm.php',        'label' => '② 納品確定'],
+    ['href' => '/return_goods/return_goods_input.php',  'label' => '返品伝票入力'],
+    ['href' => '/delivery/undelivered_print.php',       'label' => '未納品一覧表'],
+]);
 ?>
+<div class="cards">
+  <?= statCard('未確定の伝票', h(count($slips)) . '枚') ?>
+  <?= statCard('うち返品伝票', h($returnCount) . '枚') ?>
+  <?= statCard('未確定の金額', h(formatYen($totalAmount))) ?>
+</div>
 <?php if (!$slips): ?>
-  <p>未確定の納品伝票はありません。</p>
+  <div class="card form-card"><p class="hint" style="margin:0">未確定の納品伝票・返品伝票はありません。<a href="/delivery/delivery_input.php">納品入力</a>・<a href="/return_goods/return_goods_input.php">返品伝票入力</a>で登録した伝票がここに出ます。</p></div>
+  <div class="action-bar"><div class="bar-in">
+    <span class="bar-spacer"></span>
+    <a href="/delivery/delivery_input.php" class="btn">納品入力へ</a>
+    <a href="/menu.php" class="btn">メニューへ戻る</a>
+  </div></div>
 <?php else: ?>
+<p class="hint">確定する伝票を選んでください。確定すると在庫が更新され（納品は増・返品/訂正は減）、あとから変更できません。</p>
 <form method="post" data-confirm="チェックした納品伝票を確定し、在庫を更新します。確定後は変更できません。よろしいですか？">
-  <table class="data-table">
-    <thead>
-      <tr><th><input type="checkbox" class="js-check-all" title="すべて選択"></th><th>伝票No</th><th>区分</th><th>納品日</th><th>卸業者</th><th>明細</th><th>合計金額</th><th>状態</th><th>削除</th></tr>
-    </thead>
-    <tbody>
-      <?php foreach ($slips as $slip): ?>
-      <tr class="<?= (int)$slip['is_return'] === 1 ? 'row-return' : '' ?>">
-        <td><input type="checkbox" name="delivery_no[]" value="<?= h($slip['delivery_no']) ?>" class="js-check"></td>
-        <td class="num"><?= h($slip['delivery_no']) ?></td>
-        <td><?= (int)$slip['is_return'] === 1 ? '返品' : '納品' ?></td>
-        <td><?= h(formatDate($slip['delivery_date'])) ?></td>
-        <td><?= h($slip['supplier_code'] . ' ' . $slip['supplier_name']) ?></td>
-        <td>
-          <table class="inner-table">
+  <p class="note"><label><input type="checkbox" class="js-check-all"> すべての伝票を選択</label></p>
+  <?php foreach ($slips as $i => $slip): $isReturn = (int)$slip['is_return'] === 1; $qty = array_sum(array_column($slip['details'], 'delivery_qty')); ?>
+  <div class="card slip-card" data-n="<?= count($slip['details']) ?>" data-q="<?= h($qty) ?>" data-a="<?= h($slip['total']) ?>">
+    <label class="slip-head <?= $isReturn ? 'row-return' : '' ?>">
+      <input type="checkbox" name="delivery_no[]" value="<?= h($slip['delivery_no']) ?>" class="js-check" aria-label="伝票No.<?= h($slip['delivery_no']) ?>を選択">
+      <span class="slip-title">No.<?= h($slip['delivery_no']) ?>　<?= h($slip['supplier_name']) ?>
+        <?= $isReturn ? '<span class="st st-return">返品</span>' : '<span class="st st-none">納品</span>' ?> <?= statusPill(0) ?>
+        <small><?= h(formatDate($slip['delivery_date'])) ?></small></span>
+      <span class="slip-sum">
+        <span><small>明細</small><b><?= count($slip['details']) ?>件</b></span>
+        <span><small>数量合計</small><b class="<?= $qty < 0 ? 'neg' : '' ?>"><?= h($qty) ?></b></span>
+        <span><small>合計金額</small><b class="<?= (int)$slip['total'] < 0 ? 'neg' : '' ?>"><?= h(formatYen($slip['total'])) ?></b></span>
+      </span>
+    </label>
+    <details<?= $i === 0 ? ' open' : '' ?>>
+      <summary>明細を見る</summary>
+      <div class="tbl-scroll">
+        <table class="data-table compact">
+          <thead><tr><th>発注No</th><th>商品コード</th><th>商品名</th><th class="num">数量</th><th class="num">金額</th><th>メモ</th></tr></thead>
+          <tbody>
             <?php foreach ($slip['details'] as $d): ?>
             <tr class="<?= minusClass($d['delivery_qty']) ?>">
-              <td><small>発注<?= h($d['order_no'] . '-' . $d['order_line_no']) ?></small></td>
-              <td><?= h($d['product_code'] . ' ' . $d['product_name'] . ' ' . $d['spec']) ?><?= storageBadge($d['storage_type']) ?></td>
+              <td><?= h($d['order_no'] . '-' . $d['order_line_no']) ?></td>
+              <td><?= h($d['product_code']) ?></td>
+              <td><?= h($d['product_name'] . ' ' . $d['spec']) ?><?= storageBadge($d['storage_type']) ?></td>
               <td class="num"><?= h($d['delivery_qty']) ?></td>
               <td class="num"><?= h(formatYen($d['amount'])) ?></td>
               <td><?= h($d['memo']) ?></td>
             </tr>
             <?php endforeach; ?>
-          </table>
-        </td>
-        <td class="num <?= minusClass($slip['total']) ?>"><?= h(formatYen($slip['total'])) ?></td>
-        <?= statusCell(0) ?>
-        <td><button type="submit" form="deleteForm<?= h($slip['delivery_no']) ?>" class="btn btn-small btn-danger">削除</button></td>
-      </tr>
-      <?php endforeach; ?>
-    </tbody>
-  </table>
-  <div class="btn-area">
-    <button type="submit" class="btn btn-danger">確定</button>
-    <a href="/menu.php" class="btn">メニューへ戻る</a>
+          </tbody>
+        </table>
+      </div>
+    </details>
+    <div class="slip-foot">
+      <span style="margin-left:auto"></span>
+      <button type="submit" form="deleteForm<?= h($slip['delivery_no']) ?>" class="btn btn-small">この伝票を削除</button>
+    </div>
   </div>
+  <?php endforeach; ?>
+
+  <div class="action-bar"><div class="bar-in">
+    <div class="bar-sum">
+      <span><small>選択</small><b id="selCount">0</b>枚</span>
+      <span><small>明細</small><b id="selLines">0件</b></span>
+      <span><small>数量</small><b id="selQty">0</b></span>
+      <span><small>金額</small><b id="selAmount">¥0</b></span>
+    </div>
+    <button type="submit" class="btn btn-danger" id="btnConfirm" disabled>選択した伝票を確定する</button>
+    <a href="/delivery/delivery_input.php" class="btn">納品入力へ</a>
+    <a href="/menu.php" class="btn">メニューへ戻る</a>
+  </div></div>
 </form>
 <?php // 削除ボタン用のフォーム（確定フォームの中に form は入れられないので外に置き、ボタンの form 属性で指す） ?>
 <?php foreach ($slips as $slip): ?>
@@ -148,5 +184,4 @@ require_once __DIR__ . '/../common/header.php';
 </form>
 <?php endforeach; ?>
 <?php endif; ?>
-<p><a href="/delivery/delivery_input.php">納品入力へ</a> ／ <a href="/return_goods/return_goods_input.php">返品伝票へ</a> ／ <a href="/delivery/undelivered_print.php">未納品一覧表へ</a></p>
 <?php require_once __DIR__ . '/../common/footer.php'; ?>

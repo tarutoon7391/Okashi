@@ -122,13 +122,20 @@ require_once __DIR__ . '/../common/header.php';
   <a href="/stocktaking/stocktaking_input.php" class="btn">全商品を表示</a>
 </form>
 
+<?php $zeroStock = count(array_filter($list, fn($p) => (int)$p['stock_qty'] <= 0)); ?>
+<div class="cards">
+  <?= statCard('表示中の商品', h(count($list)) . '商品') ?>
+  <?= statCard('在庫が0以下の商品', h($zeroStock) . '商品', $zeroStock > 0 ? 'warn' : '') ?>
+  <?= statCard('差異のある商品', '0商品', '', 'diffCount') ?>
+</div>
 <form method="post" data-confirm="入力した実数で在庫を更新します。差異がある商品は棚卸伝票に記録されます。よろしいですか？">
   <input type="hidden" name="keyword" value="<?= h($keyword) ?>">
-  <div class="form-grid">
+  <div class="filter-form">
     <label for="stocktakingDate">棚卸日</label>
     <input type="date" id="stocktakingDate" name="stocktaking_date" value="<?= h($stocktakingDate) ?>" required>
+    <span class="hint">数えた商品だけ実数を入れてください（空欄は変更しません）。在庫と違う場合は原因・理由が必須です。</span>
   </div>
-  <p class="note">数えた商品だけ実数を入れてください（空欄は変更しません）。在庫と違う場合は原因・理由が必須です。</p>
+  <div class="card tbl-scroll">
   <table class="data-table">
     <thead>
       <tr><th>商品コード</th><th>商品名</th><th>規格</th><th>入数</th><th>現在の在庫数</th><th>実数</th><th>差異</th><th>差異の原因・理由</th></tr>
@@ -143,7 +150,7 @@ require_once __DIR__ . '/../common/header.php';
         <td><?= h($p['product_name']) ?><?= storageBadge($p['storage_type']) ?></td>
         <td><?= h($p['spec']) ?></td>
         <td class="num"><?= h($p['pack_qty']) ?></td>
-        <td class="num"><?= h($p['stock_qty']) ?><input type="hidden" name="book_qty[<?= h($code) ?>]" value="<?= h($p['stock_qty']) ?>"></td>
+        <td class="num"><?= (int)$p['stock_qty'] <= 0 ? '<span class="st st-zero">' . h($p['stock_qty']) . '</span>' : h($p['stock_qty']) ?><input type="hidden" name="book_qty[<?= h($code) ?>]" value="<?= h($p['stock_qty']) ?>"></td>
         <td><input type="number" name="actual_qty[<?= h($code) ?>]" class="js-actual" value="<?= h($actualInput[$code] ?? '') ?>" min="0" step="1"></td>
         <td class="num js-diff"></td>
         <td><input type="text" name="reason[<?= h($code) ?>]" class="js-reason" value="<?= h($reasonInput[$code] ?? '') ?>" maxlength="200"></td>
@@ -151,9 +158,11 @@ require_once __DIR__ . '/../common/header.php';
       <?php endforeach; ?>
     </tbody>
   </table>
-  <div class="btn-area">
+  </div>
+  <div class="action-bar"><div class="bar-in">
+    <div class="bar-sum"><span><small>入力した商品</small><b id="actualCount">0</b></span><span><small>差異あり</small><b id="diffCountBar">0</b></span></div>
     <button type="submit" class="btn btn-primary">更新</button>
     <a href="/menu.php" class="btn">メニューへ戻る</a>
-  </div>
+</div></div>
 </form>
 <?php require_once __DIR__ . '/../common/footer.php'; ?>

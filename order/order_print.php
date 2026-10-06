@@ -85,13 +85,19 @@ $orderDates = array_values(array_unique(array_column($slips, 'order_date')));
 
 $pageTitle = '発注書';
 require_once __DIR__ . '/../common/header.php';
+renderTabs([
+    ['href' => '/order/order_input.php',   'label' => '① 発注入力'],
+    ['href' => '/order/order_confirm.php', 'label' => '② 発注確定'],
+    ['href' => '/order/order_print.php',   'label' => '③ 発注書'],
+]);
 ?>
 <?php if (MAIL_DRIVER === 'log'): ?>
   <p class="dev-note">開発モード（MAIL_DRIVER=log）のため、メールは実際には送られません（送信日時も記録されません）。</p>
 <?php endif; ?>
 <?php if (!$slips): ?>
-  <p>確定済みの発注伝票はありません。</p>
+  <p class="hint">確定済みの発注伝票はありません。</p>
 <?php else: ?>
+<div class="card tbl-scroll">
 <table class="data-table">
   <thead>
     <tr><th>伝票No</th><th>発注日</th><th>卸業者</th><th>明細</th><th>合計金額</th><th>起票者</th><th>確定者・確定日時</th><th>メール送信</th><th>帳票</th></tr>
@@ -146,6 +152,7 @@ require_once __DIR__ . '/../common/header.php';
     <?php endforeach; ?>
   </tbody>
 </table>
+</div>
 <p>検品一覧表をまとめて印刷（同じ卸業者・同じ発注日の伝票は1ページにまとめます）：
   <?php if (count($slips) > 1 && $orderNos): ?>
     <a href="/order/inspection_print.php?order_no=<?= h(implode(',', array_column($slips, 'order_no'))) ?>" target="_blank" class="btn btn-small">この一覧の伝票すべて</a>
@@ -155,10 +162,11 @@ require_once __DIR__ . '/../common/header.php';
   <?php endforeach; ?>
 </p>
 <?php endif; ?>
-<div class="btn-area">
+<div class="action-bar"><div class="bar-in">
+  <span class="bar-spacer"></span>
   <?php if (currentOperator()['can_approve_order'] === 1): ?>
   <a href="/order/order_confirm.php" class="btn">発注確定へ戻る</a>
   <?php endif; ?>
   <a href="/menu.php" class="btn">メニューへ戻る</a>
-</div>
+</div></div>
 <?php require_once __DIR__ . '/../common/footer.php'; ?>

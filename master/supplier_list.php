@@ -20,6 +20,11 @@ $suppliers = $st->fetchAll();
 
 $pageTitle = '卸業者一覧';
 require_once __DIR__ . '/../common/header.php';
+renderTabs([
+    ['href' => '/master/product_list.php',  'label' => '商品一覧'],
+    ['href' => '/master/supplier_list.php', 'label' => '卸業者一覧'],
+    ['href' => '/master/operator_list.php', 'label' => '操作者一覧'],
+]);
 ?>
 <form method="get" class="filter-form">
   <label>業者名 <input type="search" name="keyword" value="<?= h($keyword) ?>"></label>
@@ -29,6 +34,7 @@ require_once __DIR__ . '/../common/header.php';
 <div class="btn-area">
   <a href="/master/supplier_edit.php" class="btn btn-primary">新規登録</a>
 </div>
+<div class="card tbl-scroll">
 <table class="data-table">
   <thead>
     <tr><th>卸業者コード</th><th>卸業者名</th><th>営業所住所</th><th>発注先メール</th><th>担当者</th><th>取扱商品数</th><th>補足メモ</th><th></th></tr>
@@ -55,5 +61,9 @@ require_once __DIR__ . '/../common/header.php';
     <?php endforeach; ?>
   </tbody>
 </table>
-<div class="btn-area"><a href="/menu.php" class="btn">メニューへ戻る</a></div>
+</div>
+<div class="action-bar"><div class="bar-in">
+  <span class="bar-spacer"></span>
+  <a href="/menu.php" class="btn">メニューへ戻る</a>
+</div></div>
 <?php require_once __DIR__ . '/../common/footer.php'; ?>

@@ -197,15 +197,21 @@ $products = getProductOptions();
 $pageTitle  = '発注入力';
 $pageScript = 'order_input.js';
 require_once __DIR__ . '/../common/header.php';
+renderTabs([
+    ['href' => '/order/order_input.php',   'label' => '① 発注入力'],
+    ['href' => '/order/order_confirm.php', 'label' => '② 発注確定'],
+    ['href' => '/order/order_print.php',   'label' => '③ 発注書'],
+]);
 ?>
 <form method="post" id="orderForm">
-  <div class="form-grid">
+  <div class="filter-form">
     <label for="orderDate">発注日</label>
     <input type="date" id="orderDate" name="order_date" value="<?= h($orderDate) ?>" required>
+    <span class="hint">商品コードを入れると商品情報が出ます。卸業者が違う商品は自動で別の伝票になります。
+      取消・訂正は数量をマイナスにして、取消元の発注明細を選んでください（単価は取消元の発注時の単価になります）。</span>
   </div>
-  <p class="note">商品コードを入れると商品情報が出ます。卸業者が違う商品は自動で別の伝票になります。
-    取消・訂正は数量をマイナスにして、取消元の発注明細を選んでください（単価は取消元の発注時の単価になります）。</p>
 
+  <div class="card tbl-scroll">
   <table class="data-table order-input-table">
     <thead>
       <tr><th>No</th><th>商品コード</th><th>商品情報</th><th>数量</th><th>取消元（マイナス時）</th><th>発注時メモ</th><th>納品金額</th><th></th></tr>
@@ -224,10 +230,8 @@ require_once __DIR__ . '/../common/header.php';
       </tr>
       <?php endforeach; ?>
     </tbody>
-    <tfoot>
-      <tr><td colspan="6" class="num">合計</td><td class="num" id="orderTotal"></td><td></td></tr>
-    </tfoot>
   </table>
+  </div>
   <datalist id="productList">
     <?php foreach ($products as $p): ?>
       <option value="<?= h($p['product_code']) ?>"><?= h($p['product_name'] . ' ' . $p['spec']) ?></option>
@@ -235,10 +239,12 @@ require_once __DIR__ . '/../common/header.php';
   </datalist>
   <script id="cancelCandidates" type="application/json"><?= json_encode($cancelCandidates, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?></script>
 
-  <div class="btn-area">
+  <div class="action-bar"><div class="bar-in">
+    <div class="bar-sum"><span><small>発注金額合計</small><b id="orderTotal">¥0</b></span></div>
     <button type="button" class="btn" id="addRowButton">＋行追加</button>
     <button type="submit" class="btn btn-primary">登録</button>
+    <a href="/order/order_confirm.php" class="btn">発注確定へ</a>
     <a href="/menu.php" class="btn">メニューへ戻る</a>
-  </div>
+</div></div>
 </form>
 <?php require_once __DIR__ . '/../common/footer.php'; ?>

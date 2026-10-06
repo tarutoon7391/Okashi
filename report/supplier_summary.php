@@ -49,6 +49,7 @@ require_once __DIR__ . '/../common/header.php';
 ?>
 <?php renderReportFilter($filter, ['supplier' => false, 'product' => false]); ?>
 <div class="chart-layout">
+  <div class="card tbl-scroll">
   <table class="data-table">
     <thead>
       <tr><th></th><th>卸業者コード</th><th>卸業者名</th><th>納品金額</th><th>返品金額</th><th>純額</th><th>構成比</th></tr>
@@ -75,11 +76,15 @@ require_once __DIR__ . '/../common/header.php';
         <td></td></tr>
     </tfoot>
   </table>
+  </div>
   <div class="chart-box">
     <canvas id="supplierChart" width="320" height="320" aria-label="卸業者別納品金額の円グラフ"></canvas>
     <p id="chartEmpty" class="note" hidden>グラフに出せるデータがありません</p>
   </div>
 </div>
 <script id="chartData" type="application/json"><?= json_encode($chartData, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?></script>
-<div class="btn-area"><a href="/menu.php" class="btn">メニューへ戻る</a></div>
+<div class="action-bar"><div class="bar-in">
+  <span class="bar-spacer"></span>
+  <a href="/menu.php" class="btn">メニューへ戻る</a>
+</div></div>
 <?php require_once __DIR__ . '/../common/footer.php'; ?>
