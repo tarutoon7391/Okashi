@@ -24,11 +24,20 @@ if (session_status() === PHP_SESSION_NONE) {
 // ログイン中でも毎回 m_operator を1件読み直し、削除・権限変更をすぐ反映する
 //   削除済み（または存在しない）→ ログアウトしてログイン画面へ
 //   氏名・発注承認可はセッションの値を最新に書き換える（requireApprover もこの値で判定）
+//   OP001 が強制ログアウトした操作者（その後ログインし直していない）→ メッセージを出してログイン画面へ
 function requireLogin(): void
 {
     if (empty($_SESSION['operator_code'])) {
         redirect('/index.php');
     }
+    $kick = findKick($_SESSION['operator_code'], (float)($_SESSION['login_at'] ?? 0));
+    if ($kick !== null) {
+        $_SESSION = [];
+        session_regenerate_id(true);
+        setFlash('warning', '管理者によりログアウトされました' . ($kick['msg'] !== '' ? '：' . $kick['msg'] : ''));
+        redirect('/index.php');
+    }
+    touchLastSeen($_SESSION['operator_code']);
     $st = getDb()->prepare(
         'SELECT operator_name, can_approve_order
            FROM m_operator
@@ -202,6 +211,7 @@ function completeLogin(array $op): void
     $_SESSION['operator_code']     = $op['operator_code'];
     $_SESSION['operator_name']     = $op['operator_name'];
     $_SESSION['can_approve_order'] = (int)$op['can_approve_order'];
+    $_SESSION['login_at']          = microtime(true);   // 強制ログアウトより後のログインかを見分ける
 }
 
 function logout(): void
@@ -222,4 +232,82 @@ function currentOperator(): array
         'operator_name'     => $_SESSION['operator_name'] ?? '',
         'can_approve_order' => (int)($_SESSION['can_approve_order'] ?? 0),
     ];
+}
+
+// ---------------------------------------------------------------
+// 強制ログアウト（SC-74 操作者一覧から。OP001 だけが使える）
+// テーブルは増やさず、ログインロックと同じく一時ディレクトリの JSON に記録する
+//   okashi_kick.json      … 操作者コード => ['at' => 実行時刻, 'msg' => メッセージ, 'by' => 実行者]
+//   okashi_last_seen.json … 操作者コード => 最後に画面を開いた時刻（「ログイン中」表示用）
+// ※ 再デプロイで消えるが、そのときはセッションも消える（全員ログアウトになる）ので問題ない
+// ---------------------------------------------------------------
+const KICK_ADMIN_CODE = 'OP001';
+const LAST_SEEN_ONLINE_MIN = 10;   // 最後の操作からこの分数以内なら「ログイン中」とみなす
+
+// 一時ディレクトリの JSON ファイルを排他ロックして読み、$fn で書き換えて保存する
+function withTempJson(string $name, callable $fn)
+{
+    $path = sys_get_temp_dir() . DIRECTORY_SEPARATOR . $name;
+    $fp = @fopen($path, 'c+');
+    if ($fp === false) {
+        $data = [];
+        return $fn($data);
+    }
+    flock($fp, LOCK_EX);
+    $data = json_decode(stream_get_contents($fp) ?: '[]', true) ?: [];
+    $result = $fn($data);
+    ftruncate($fp, 0);
+    rewind($fp);
+    fwrite($fp, json_encode($data, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]');
+    fflush($fp);
+    flock($fp, LOCK_UN);
+    fclose($fp);
+    return $result;
+}
+
+// $code を強制ログアウトする。$code が次に画面を開いたときにログイン画面へ戻る
+function kickOperator(string $code, string $msg, string $by): void
+{
+    withTempJson('okashi_kick.json', function (array &$data) use ($code, $msg, $by) {
+        $data[$code] = ['at' => microtime(true), 'msg' => $msg, 'by' => $by];
+        return null;
+    });
+    withTempJson('okashi_last_seen.json', function (array &$data) use ($code) {
+        unset($data[$code]);
+        return null;
+    });
+}
+
+// ログイン時刻 $loginAt より後に強制ログアウトされていれば、その記録。なければ null
+function findKick(string $code, float $loginAt): ?array
+{
+    $path = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'okashi_kick.json';
+    if (!is_file($path)) {
+        return null;
+    }
+    $data = json_decode((string)@file_get_contents($path), true) ?: [];
+    $k = $data[$code] ?? null;
+    return ($k !== null && $k['at'] > $loginAt) ? $k : null;
+}
+
+// 最後に画面を開いた時刻を記録（書き込みは1分に1回まで）
+function touchLastSeen(string $code): void
+{
+    if (time() - ($_SESSION['last_seen_saved'] ?? 0) < 60) {
+        return;
+    }
+    $_SESSION['last_seen_saved'] = time();
+    withTempJson('okashi_last_seen.json', function (array &$data) use ($code) {
+        $data[$code] = time();
+        return null;
+    });
+}
+
+// 操作者コード => 最後に画面を開いた時刻（LAST_SEEN_ONLINE_MIN 分以内の人だけ）
+function onlineOperators(): array
+{
+    $path = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'okashi_last_seen.json';
+    $data = is_file($path) ? (json_decode((string)@file_get_contents($path), true) ?: []) : [];
+    $limit = time() - LAST_SEEN_ONLINE_MIN * 60;
+    return array_filter($data, fn($t) => $t >= $limit);
 }

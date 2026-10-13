@@ -114,6 +114,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, .btn:focus-vi
 
 /* 行内フォーム */
 .inline-form { display: inline; }
+.data-table .kick-form input[type="text"] { width: 16em; min-width: 0; margin-left: .533rem; padding: 3px 8px; font-size: .87rem; }   /* 強制ログアウトのメッセージ欄 */
 .nowrap { white-space: nowrap; }
 
 /* 絞り込みフォーム（明細表・集計・一覧の上） */

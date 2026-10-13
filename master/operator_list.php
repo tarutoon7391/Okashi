@@ -13,6 +13,9 @@ $operators = $pdo->query(
 $me = currentOperator();
 // 承認不可の操作者は自分の行の「編集」だけ出す（他人の編集・削除ボタンは出さない。サーバ側でも弾く）
 $isApprover = $me['can_approve_order'] === 1;
+// OP001 だけ「ログイン中」と強制ログアウトを出す
+$isKickAdmin = $me['operator_code'] === KICK_ADMIN_CODE;
+$online = $isKickAdmin ? onlineOperators() : [];
 
 $pageTitle = '操作者一覧';
 require_once __DIR__ . '/../common/header.php';
@@ -32,7 +35,7 @@ renderTabs([
 <div class="card tbl-scroll">
 <table class="data-table">
   <thead>
-    <tr><th>操作者コード</th><th>操作者名</th><th>メールアドレス</th><th>発注承認</th><th>更新日時</th><th></th></tr>
+    <tr><th>操作者コード</th><th>操作者名</th><th>メールアドレス</th><th>発注承認</th><th>更新日時</th><?php if ($isKickAdmin): ?><th>ログイン</th><?php endif; ?><th></th></tr>
   </thead>
   <tbody>
     <?php foreach ($operators as $o): ?>
@@ -42,6 +45,9 @@ renderTabs([
       <td><?= h($o['email']) ?></td>
       <td><?= (int)$o['can_approve_order'] === 1 ? '<span class="status-confirmed">可</span>' : '不可' ?></td>
       <td><?= h($o['updated_at']) ?></td>
+      <?php if ($isKickAdmin): ?>
+      <td class="nowrap"><?php if (isset($online[$o['operator_code']])): ?><span class="st st-editing">ログイン中</span> <small class="note"><?= h(date('H:i', $online[$o['operator_code']])) ?> 最終操作</small><?php endif; ?></td>
+      <?php endif; ?>
       <td class="nowrap">
         <?php if ($isApprover || $o['operator_code'] === $me['operator_code']): ?>
         <a href="/master/operator_edit.php?operator_code=<?= h(rawurlencode($o['operator_code'])) ?>" class="btn btn-small">編集</a>
@@ -50,6 +56,13 @@ renderTabs([
         <form method="post" action="/master/operator_delete.php" class="inline-form" data-confirm="<?= h($o['operator_name']) ?> を削除します。よろしいですか？">
           <input type="hidden" name="operator_code" value="<?= h($o['operator_code']) ?>">
           <button type="submit" class="btn btn-small btn-danger">削除</button>
+        </form>
+        <?php endif; ?>
+        <?php if ($isKickAdmin && $o['operator_code'] !== $me['operator_code']): ?>
+        <form method="post" action="/master/operator_kick.php" class="inline-form kick-form" data-confirm="<?= h($o['operator_name']) ?> を強制ログアウトします。よろしいですか？">
+          <input type="hidden" name="operator_code" value="<?= h($o['operator_code']) ?>">
+          <input type="text" name="message" maxlength="100" placeholder="相手に出すメッセージ（任意）" aria-label="相手に出すメッセージ">
+          <button type="submit" class="btn btn-small">強制ログアウト</button>
         </form>
         <?php endif; ?>
       </td>
