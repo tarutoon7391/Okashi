@@ -160,7 +160,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, .btn:focus-vi
 
 /* ログイン */
 .login-box { max-width: 32rem; background: var(--card); border: 1px solid var(--line); border-radius: .667rem; padding: 1.333rem 1.6rem; }
-.login-box .btn-area { margin: 1.067rem 0 .533rem; }
+.login-box .btn-area { margin: 1.067rem 0 .533rem; justify-content: space-between; }   /* 確認＝左端、戻る＝右端 */
 
 /* メニュー */
 /* 左（ジャンル）と右（行き先）で1つの枠を共用し、間は線1本で区切る。枠の大きさはジャンルを切り替えても変わらない */
