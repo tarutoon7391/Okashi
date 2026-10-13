@@ -15,8 +15,11 @@ $where  = buildReportWhere($filter, [
 ], $params);
 $st = $pdo->prepare(
     "SELECT t.sales_no, t.sales_date, t.product_code, p.product_name, p.spec, p.storage_type, p.list_price,
-            t.sales_qty, t.amount, t.is_confirmed
+            t.sales_qty, t.amount, t.is_confirmed,
+            t.created_by, op.operator_name AS created_name, t.confirmed_by, cop.operator_name AS confirmed_name
        FROM t_sales t JOIN m_product p ON p.product_code = t.product_code
+       LEFT JOIN m_operator op  ON op.operator_code = t.created_by
+       LEFT JOIN m_operator cop ON cop.operator_code = t.confirmed_by
       WHERE {$where}
       ORDER BY t.sales_date, p.product_kana, t.sales_no"
 );
@@ -30,10 +33,10 @@ require_once __DIR__ . '/../common/header.php';
 <div class="card tbl-scroll">
 <table class="data-table">
   <thead>
-    <tr><th>売上日</th><th>売上No</th><th>商品コード</th><th>商品名</th><th>定価</th><th>売上数</th><th>売上金額</th><th>状態</th></tr>
+    <tr><th>売上日</th><th>売上No</th><th>商品コード</th><th>商品名</th><th>定価</th><th>売上数</th><th>売上金額</th><th>入力者</th><th>確定者</th><th>状態</th></tr>
   </thead>
   <tbody>
-    <?php if (!$rows): ?><tr><td colspan="8">該当するデータがありません</td></tr><?php endif; ?>
+    <?php if (!$rows): ?><tr><td colspan="10">該当するデータがありません</td></tr><?php endif; ?>
     <?php foreach ($rows as $r): ?>
     <tr class="<?= minusClass($r['sales_qty']) ?>">
       <td><?= h(formatDate($r['sales_date'])) ?></td>
@@ -43,6 +46,8 @@ require_once __DIR__ . '/../common/header.php';
       <td class="num"><?= h(formatYen($r['list_price'])) ?></td>
       <td class="num"><?= h($r['sales_qty']) ?></td>
       <td class="num"><?= h(formatYen($r['amount'])) ?></td>
+      <td><?= h($r['created_name'] ?? $r['created_by'] ?? '') ?></td>
+      <td><?= h($r['confirmed_name'] ?? $r['confirmed_by'] ?? '') ?></td>
       <?= statusCell($r['is_confirmed']) ?>
     </tr>
     <?php endforeach; ?>
@@ -50,7 +55,7 @@ require_once __DIR__ . '/../common/header.php';
   <tfoot>
     <tr><td colspan="5" class="num">合計</td>
       <td class="num"><?= h(array_sum(array_column($rows, 'sales_qty'))) ?></td>
-      <td class="num"><?= h(formatYen(array_sum(array_column($rows, 'amount')))) ?></td><td></td></tr>
+      <td class="num"><?= h(formatYen(array_sum(array_column($rows, 'amount')))) ?></td><td colspan="3"></td></tr>
   </tfoot>
 </table>
 </div>

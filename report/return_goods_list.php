@@ -17,11 +17,14 @@ $where  = buildReportWhere($filter, [
 $st = $pdo->prepare(
     "SELECT h.delivery_no, d.line_no, h.delivery_date, h.supplier_code, s.supplier_name, h.is_confirmed,
             d.order_no, d.order_line_no, d.product_code, p.product_name, p.spec, p.storage_type,
-            -d.delivery_qty AS return_qty, d.contract_price, -d.amount AS return_amount, d.memo
+            -d.delivery_qty AS return_qty, d.contract_price, -d.amount AS return_amount, d.memo,
+            h.created_by, op.operator_name AS created_name, h.confirmed_by, cop.operator_name AS confirmed_name
        FROM t_delivery_detail d
        JOIN t_delivery h ON h.delivery_no = d.delivery_no
        JOIN m_supplier s ON s.supplier_code = h.supplier_code
        JOIN m_product p  ON p.product_code = d.product_code
+       LEFT JOIN m_operator op  ON op.operator_code = h.created_by
+       LEFT JOIN m_operator cop ON cop.operator_code = h.confirmed_by
       WHERE h.is_return = 1 AND {$where}
       ORDER BY h.supplier_code, h.delivery_date, h.delivery_no, d.line_no"
 );
@@ -41,10 +44,10 @@ require_once __DIR__ . '/../common/header.php';
 <div class="card tbl-scroll">
 <table class="data-table">
   <thead>
-    <tr><th>返品日</th><th>返品伝票No</th><th>元の発注No</th><th>商品コード</th><th>商品名</th><th>返品数</th><th>契約単価</th><th>返品金額</th><th>返品理由</th><th>状態</th></tr>
+    <tr><th>返品日</th><th>返品伝票No</th><th>元の発注No</th><th>商品コード</th><th>商品名</th><th>返品数</th><th>契約単価</th><th>返品金額</th><th>返品理由</th><th>起票者</th><th>確定者</th><th>状態</th></tr>
   </thead>
   <?php if (!$groups): ?>
-    <tbody><tr><td colspan="10">該当するデータがありません</td></tr></tbody>
+    <tbody><tr><td colspan="12">該当するデータがありません</td></tr></tbody>
   <?php endif; ?>
   <?php foreach ($groups as $code => $g):
       $subQty = array_sum(array_column($g['rows'], 'return_qty'));
@@ -52,7 +55,7 @@ require_once __DIR__ . '/../common/header.php';
       $grandQty += $subQty;
       $grandAmount += $subAmount; ?>
   <tbody>
-    <tr class="group-row"><td colspan="10"><?= h($code . ' ' . $g['name']) ?></td></tr>
+    <tr class="group-row"><td colspan="12"><?= h($code . ' ' . $g['name']) ?></td></tr>
     <?php foreach ($g['rows'] as $r): ?>
     <tr class="row-return">
       <td><?= h(formatDate($r['delivery_date'])) ?></td>
@@ -64,14 +67,16 @@ require_once __DIR__ . '/../common/header.php';
       <td class="num"><?= h(formatYen($r['contract_price'])) ?></td>
       <td class="num"><?= h(formatYen($r['return_amount'])) ?></td>
       <td><?= h($r['memo']) ?></td>
+      <td><?= h($r['created_name'] ?? $r['created_by'] ?? '') ?></td>
+      <td><?= h($r['confirmed_name'] ?? $r['confirmed_by'] ?? '') ?></td>
       <?= statusCell($r['is_confirmed']) ?>
     </tr>
     <?php endforeach; ?>
-    <tr class="subtotal-row"><td colspan="5" class="num">小計</td><td class="num"><?= h($subQty) ?></td><td></td><td class="num"><?= h(formatYen($subAmount)) ?></td><td colspan="2"></td></tr>
+    <tr class="subtotal-row"><td colspan="5" class="num">小計</td><td class="num"><?= h($subQty) ?></td><td></td><td class="num"><?= h(formatYen($subAmount)) ?></td><td colspan="4"></td></tr>
   </tbody>
   <?php endforeach; ?>
   <tfoot>
-    <tr><td colspan="5" class="num">合計</td><td class="num"><?= h($grandQty) ?></td><td></td><td class="num"><?= h(formatYen($grandAmount)) ?></td><td colspan="2"></td></tr>
+    <tr><td colspan="5" class="num">合計</td><td class="num"><?= h($grandQty) ?></td><td></td><td class="num"><?= h(formatYen($grandAmount)) ?></td><td colspan="4"></td></tr>
   </tfoot>
 </table>
 </div>
