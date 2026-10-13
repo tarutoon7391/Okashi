@@ -30,11 +30,7 @@ function requireLogin(): void
     if (empty($_SESSION['operator_code'])) {
         redirect('/index.php');
     }
-    $kick = findKick($_SESSION['operator_code'], (float)($_SESSION['login_at'] ?? 0));
-    if ($kick !== null) {
-        $_SESSION = [];
-        session_regenerate_id(true);
-        setFlash('warning', '管理者によりログアウトされました' . ($kick['msg'] !== '' ? '：' . $kick['msg'] : ''));
+    if (logoutIfKicked()) {
         redirect('/index.php');
     }
     touchLastSeen($_SESSION['operator_code']);
@@ -242,7 +238,10 @@ function currentOperator(): array
 // ※ 再デプロイで消えるが、そのときはセッションも消える（全員ログアウトになる）ので問題ない
 // ---------------------------------------------------------------
 const KICK_ADMIN_CODE = 'OP001';
-const LAST_SEEN_ONLINE_MIN = 10;   // 最後の操作からこの分数以内なら「ログイン中」とみなす
+// 画面を開いている間は js/common.js が session_ping.php を PING_INTERVAL_SEC ごとに呼ぶ
+// （裏のタブはブラウザが1分に1回まで間引くので、判定は余裕を見て2分）
+const PING_INTERVAL_SEC = 5;
+const LAST_SEEN_ONLINE_SEC = 120;   // 最後の通信からこの秒数以内なら「ログイン中」とみなす
 
 // 一時ディレクトリの JSON ファイルを排他ロックして読み、$fn で書き換えて保存する
 function withTempJson(string $name, callable $fn)
@@ -263,6 +262,19 @@ function withTempJson(string $name, callable $fn)
     flock($fp, LOCK_UN);
     fclose($fp);
     return $result;
+}
+
+// 強制ログアウトされていたら、ログイン情報を消してメッセージをセットし true（呼び出し側がログイン画面へ）
+function logoutIfKicked(): bool
+{
+    $kick = findKick($_SESSION['operator_code'] ?? '', (float)($_SESSION['login_at'] ?? 0));
+    if ($kick === null) {
+        return false;
+    }
+    $_SESSION = [];
+    session_regenerate_id(true);
+    setFlash('warning', '管理者によりログアウトされました' . ($kick['msg'] !== '' ? '：' . $kick['msg'] : ''));
+    return true;
 }
 
 // $code を強制ログアウトする。$code が次に画面を開いたときにログイン画面へ戻る
@@ -290,10 +302,10 @@ function findKick(string $code, float $loginAt): ?array
     return ($k !== null && $k['at'] > $loginAt) ? $k : null;
 }
 
-// 最後に画面を開いた時刻を記録（書き込みは1分に1回まで）
+// 最後に通信した時刻を記録（書き込みは PING_INTERVAL_SEC に1回まで）
 function touchLastSeen(string $code): void
 {
-    if (time() - ($_SESSION['last_seen_saved'] ?? 0) < 60) {
+    if (time() - ($_SESSION['last_seen_saved'] ?? 0) < PING_INTERVAL_SEC) {
         return;
     }
     $_SESSION['last_seen_saved'] = time();
@@ -303,11 +315,11 @@ function touchLastSeen(string $code): void
     });
 }
 
-// 操作者コード => 最後に画面を開いた時刻（LAST_SEEN_ONLINE_MIN 分以内の人だけ）
+// 操作者コード => 最後に通信した時刻（LAST_SEEN_ONLINE_SEC 秒以内の人だけ）
 function onlineOperators(): array
 {
     $path = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'okashi_last_seen.json';
     $data = is_file($path) ? (json_decode((string)@file_get_contents($path), true) ?: []) : [];
-    $limit = time() - LAST_SEEN_ONLINE_MIN * 60;
+    $limit = time() - LAST_SEEN_ONLINE_SEC;
     return array_filter($data, fn($t) => $t >= $limit);
 }

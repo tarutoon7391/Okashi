@@ -1,6 +1,6 @@
 <?php
 // 強制ログアウト（処理のみ）→ SC-74
-// OP001 だけが実行できる。相手は次に画面を開いたとき、メッセージ付きでログイン画面へ戻る
+// OP001 だけが実行できる。相手の画面は数秒以内に（js/common.js の確認で）メッセージ付きでログイン画面へ戻る
 require_once __DIR__ . '/../common/auth.php';
 require_once __DIR__ . '/../common/db.php';
 require_once __DIR__ . '/../common/functions.php';
@@ -29,5 +29,5 @@ if ($name === false) {
     redirect('/master/operator_list.php');
 }
 kickOperator($code, $msg, $me['operator_code']);
-setFlash('success', "{$name}（{$code}）を強制ログアウトしました。次に画面を操作したときにログイン画面へ戻ります");
+setFlash('success', "{$name}（{$code}）を強制ログアウトしました。相手の画面は数秒以内にログイン画面へ戻ります");
 redirect('/master/operator_list.php');

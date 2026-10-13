@@ -12,9 +12,10 @@ $isPublic = $isPublic ?? false;
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= h($pageTitle) ?> | <?= h(APP_NAME) ?></title>
-<link rel="stylesheet" href="/css/style.css?v=10">
+<link rel="stylesheet" href="/css/style.css?v=11">
 </head>
-<body>
+<?php // data-ping：ログイン中の画面は common.js が数秒ごとに強制ログアウトを確かめる ?>
+<body<?= $isPublic ? '' : ' data-ping="1"' ?>>
 <header class="app-header">
   <a href="<?= $isPublic ? '/index.php' : '/menu.php' ?>" class="app-title"><?= h(APP_NAME) ?></a>
   <?php if (!$isPublic): ?>

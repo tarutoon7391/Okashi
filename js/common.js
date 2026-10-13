@@ -112,3 +112,29 @@ document.addEventListener('submit', (e) => {
         e.preventDefault();
     }
 });
+
+// 画面共通：ログイン中の画面（body[data-ping]）は数秒ごとにサーバへ確認し、
+// 管理者に強制ログアウトされていたらすぐログイン画面へ移る（メッセージはログイン画面に出る）
+(function () {
+    if (!document.body || !document.body.dataset.ping) {
+        return;
+    }
+    async function ping() {
+        try {
+            const res = await fetch('/session_ping.php', { cache: 'no-store' });
+            const data = await res.json();
+            if (!data.ok) {
+                location.href = '/index.php';
+            }
+        } catch (e) {
+            // 通信エラーは次の回に任せる
+        }
+    }
+    setInterval(ping, 5000);
+    // 裏のタブから戻ってきたときもすぐ確かめる
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            ping();
+        }
+    });
+})();

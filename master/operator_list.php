@@ -18,6 +18,9 @@ $isKickAdmin = $me['operator_code'] === KICK_ADMIN_CODE;
 $online = $isKickAdmin ? onlineOperators() : [];
 
 $pageTitle = '操作者一覧';
+if ($isKickAdmin) {
+    $pageScript = 'operator_list.js';   // 「ログイン中」を数秒ごとに更新する
+}
 require_once __DIR__ . '/../common/header.php';
 renderTabs([
     ['href' => '/master/product_list.php',  'label' => '商品一覧'],
@@ -46,7 +49,7 @@ renderTabs([
       <td><?= (int)$o['can_approve_order'] === 1 ? '<span class="status-confirmed">可</span>' : '不可' ?></td>
       <td><?= h($o['updated_at']) ?></td>
       <?php if ($isKickAdmin): ?>
-      <td class="nowrap"><?php if (isset($online[$o['operator_code']])): ?><span class="st st-editing">ログイン中</span> <small class="note"><?= h(date('H:i', $online[$o['operator_code']])) ?> 最終操作</small><?php endif; ?></td>
+      <td class="nowrap js-online" data-code="<?= h($o['operator_code']) ?>"><?php if (isset($online[$o['operator_code']])): ?><span class="st st-editing">ログイン中</span> <small class="note"><?= h(date('H:i', $online[$o['operator_code']])) ?> 最終通信</small><?php endif; ?></td>
       <?php endif; ?>
       <td class="nowrap">
         <?php if ($isApprover || $o['operator_code'] === $me['operator_code']): ?>
