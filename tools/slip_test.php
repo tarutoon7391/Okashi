@@ -11,13 +11,13 @@ if (PHP_SAPI !== 'cli') {
 }
 require_once __DIR__ . '/../common/slip.php';
 
-// ログイン中の操作者のふり（承認可の OP001）
-$_SESSION['operator_code']     = 'OP001';
+// ログイン中の操作者のふり（承認可の U001）
+$_SESSION['operator_code']     = 'U001';
 $_SESSION['operator_name']     = 'テスト';
 $_SESSION['can_approve_order'] = 1;
 
 $pdo  = getDb();
-$code = 'P0001';
+$code = 'K001';
 $ng   = 0;
 
 function stockOf(string $code): int
@@ -39,12 +39,12 @@ function insertDelivery(int $orderNo, int $qty, int $isReturn): int
 {
     $pdo = getDb();
     $pdo->prepare("INSERT INTO t_delivery (delivery_date, supplier_code, is_return, created_by, updated_by)
-                   VALUES (CURDATE(), 'S001', :ret, 'OP001', 'OP001')")->execute([':ret' => $isReturn]);
+                   VALUES (CURDATE(), 'W003', :ret, 'U001', 'U001')")->execute([':ret' => $isReturn]);
     $no = (int)$pdo->lastInsertId();
     $pdo->prepare("INSERT INTO t_delivery_detail (delivery_no, line_no, order_no, order_line_no, product_code, delivery_qty,
                           contract_price, amount, created_by, updated_by)
-                   VALUES (:no, 1, :order_no, 1, 'P0001', :qty, 650, :amount, 'OP001', 'OP001')")
-        ->execute([':no' => $no, ':order_no' => $orderNo, ':qty' => $qty, ':amount' => 650 * $qty]);
+                   VALUES (:no, 1, :order_no, 1, 'K001', :qty, 620, :amount, 'U001', 'U001')")
+        ->execute([':no' => $no, ':order_no' => $orderNo, ':qty' => $qty, ':amount' => 620 * $qty]);
     return $no;
 }
 
@@ -52,10 +52,10 @@ $before = stockOf($code);
 echo "在庫（{$code}）開始時：{$before}\n";
 
 // 発注伝票（テスト用）→ confirmOrder
-$pdo->exec("INSERT INTO t_order (order_date, supplier_code, created_by, updated_by) VALUES (CURDATE(), 'S001', 'OP001', 'OP001')");
+$pdo->exec("INSERT INTO t_order (order_date, supplier_code, created_by, updated_by) VALUES (CURDATE(), 'W003', 'U001', 'U001')");
 $orderNo = (int)$pdo->lastInsertId();
 $pdo->prepare("INSERT INTO t_order_detail (order_no, line_no, product_code, order_qty, contract_price, amount, created_by, updated_by)
-               VALUES (:no, 1, 'P0001', 7, 650, 4550, 'OP001', 'OP001')")->execute([':no' => $orderNo]);
+               VALUES (:no, 1, 'K001', 7, 620, 4340, 'U001', 'U001')")->execute([':no' => $orderNo]);
 confirmOrder($orderNo);
 check('confirmOrder で在庫は動かない', $before, stockOf($code));
 try {
@@ -83,7 +83,7 @@ check('返品伝票の確定で在庫 -2', $before + 5, stockOf($code));
 
 // 売上 3 → confirmSales で -3
 $pdo->exec("INSERT INTO t_sales (sales_date, product_code, sales_qty, amount, created_by, updated_by)
-            VALUES (CURDATE(), 'P0001', 3, 2940, 'OP001', 'OP001')");
+            VALUES (CURDATE(), 'K001', 3, 3240, 'U001', 'U001')");
 $salesNo = (int)$pdo->lastInsertId();
 confirmSales($salesNo);
 check('売上確定で在庫 -3', $before + 2, stockOf($code));

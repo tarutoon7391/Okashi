@@ -13,7 +13,7 @@ $operators = $pdo->query(
 $me = currentOperator();
 // 承認不可の操作者は自分の行の「編集」だけ出す（他人の編集・削除ボタンは出さない。サーバ側でも弾く）
 $isApprover = $me['can_approve_order'] === 1;
-// OP001 だけ「ログイン中」と強制ログアウトを出す
+// U001 だけ「ログイン中」と強制ログアウトを出す
 $isKickAdmin = $me['operator_code'] === KICK_ADMIN_CODE;
 $online = $isKickAdmin ? onlineOperators() : [];
 

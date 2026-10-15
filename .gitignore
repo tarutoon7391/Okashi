@@ -16,3 +16,6 @@ Thumbs.db
 desktop.ini
 .vscode/
 .idea/
+
+# DBバックアップ（tools/dump_db.php・tools/backup_db.sh の出力）
+/backup/

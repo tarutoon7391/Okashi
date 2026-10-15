@@ -1,6 +1,6 @@
 <?php
 // 強制ログアウト（処理のみ）→ SC-74
-// OP001 だけが実行できる。相手の画面は数秒以内に（js/common.js の確認で）メッセージ付きでログイン画面へ戻る
+// U001 だけが実行できる。相手の画面は数秒以内に（js/common.js の確認で）メッセージ付きでログイン画面へ戻る
 require_once __DIR__ . '/../common/auth.php';
 require_once __DIR__ . '/../common/db.php';
 require_once __DIR__ . '/../common/functions.php';

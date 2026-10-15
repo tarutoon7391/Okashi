@@ -1,6 +1,6 @@
 <?php
-// SC-74 用：ログイン中の操作者を JSON で返す（js/operator_list.js が数秒ごとに呼ぶ）。OP001 だけ
-// {"OP002":"10:31", ...}（操作者コード => 最終通信の時刻）
+// SC-74 用：ログイン中の操作者を JSON で返す（js/operator_list.js が数秒ごとに呼ぶ）。U001 だけ
+// {"U002":"10:31", ...}（操作者コード => 最終通信の時刻）
 require_once __DIR__ . '/../common/auth.php';
 header('Content-Type: application/json; charset=UTF-8');
 header('Cache-Control: no-store');

@@ -1,4 +1,4 @@
-// SC-74 操作者一覧（OP001 のときだけ読み込む）：「ログイン中」の列を数秒ごとに更新する
+// SC-74 操作者一覧（U001 のときだけ読み込む）：「ログイン中」の列を数秒ごとに更新する
 (function () {
     const cells = document.querySelectorAll('.js-online');
     if (!cells.length) {
