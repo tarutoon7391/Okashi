@@ -121,6 +121,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, .btn:focus-vi
 .filter-form { display: flex; flex-wrap: wrap; gap: .667rem 1.067rem; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: .667rem; padding: .8rem 1.067rem; margin: 0 0 .8rem; }
 .filter-form label { display: flex; gap: .533rem; align-items: center; flex-wrap: wrap; font-weight: bold; }
 .filter-form .hint { margin: 0; font-weight: normal; }
+.filter-form input[type="search"] { width: 16em; max-width: 100%; }
 
 /* 明細表のグループ見出し・小計 */
 .data-table .group-row td { background: #dbe4f0; font-weight: bold; }
