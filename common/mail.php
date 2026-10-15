@@ -19,7 +19,7 @@ if (is_file(__DIR__ . '/../lib/autoload.php')) {
 // MAIL_DRIVER=log のときは実際には送らないが true を返す（送ったかどうかは isMailActuallySent() で判定）
 function sendMail(string $to, string $subject, string $body, array $attachments = []): bool
 {
-    if (MAIL_REDIRECT_TO !== '') {
+    if (MAIL_REDIRECT_TO !== '' && isRedirectTarget($to)) {
         $subject = "[本来の宛先:{$to}] " . $subject;
         $to = MAIL_REDIRECT_TO;
     }
@@ -38,6 +38,19 @@ function sendMail(string $to, string $subject, string $body, array $attachments 
         error_log('[mail] 送信失敗：' . $e->getMessage());
         return false;
     }
+}
+
+// 宛先が MAIL_REDIRECT_TO への転送対象か（MAIL_REDIRECT_DOMAINS のドメイン宛だけ。'*' なら全部）
+// 実在する宛先（学校や Gmail のアドレス）にはそのまま届ける
+function isRedirectTarget(string $to): bool
+{
+    $domains = array_filter(array_map('trim', explode(',', strtolower(MAIL_REDIRECT_DOMAINS))));
+    if (in_array('*', $domains, true)) {
+        return true;
+    }
+    $at = strrpos($to, '@');
+    $domain = $at === false ? '' : strtolower(substr($to, $at + 1));
+    return $domain !== '' && in_array($domain, $domains, true);
 }
 
 // 実際にメールが外へ出るドライバか（log は送らない）

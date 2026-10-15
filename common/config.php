@@ -32,9 +32,11 @@ define('SHOP_NAME', env('SHOP_NAME', 'お土産処 みやげや'));   // 発注�
 define('MAIL_DRIVER', env('MAIL_DRIVER', 'log'));
 // Resend で独自ドメインを登録していないときは onboarding@resend.dev からしか送れない
 define('MAIL_FROM', env('MAIL_FROM', MAIL_DRIVER === 'resend' ? 'onboarding@resend.dev' : 'xxxx@gmail.com'));
-// 設定すると、すべてのメールをこのアドレスに送る（本来の宛先は件名に付ける）。
-// Resend の無料テスト送信は「Resend に登録した自分のアドレス」にしか届かないため、デモではここに総括のアドレスを入れる
+// 設定すると、MAIL_REDIRECT_DOMAINS のドメイン宛のメールをこのアドレスに送る（本来の宛先は件名に付ける）。
+// 登録データのダミーアドレス（2409xxx@example.com）宛のワンタイムコードを総括が受け取るために使う
 define('MAIL_REDIRECT_TO', env('MAIL_REDIRECT_TO', ''));
+// 転送するドメイン（カンマ区切り）。既定は example.com だけ。'*' にするとすべてのメールを転送する（以前の動き）
+define('MAIL_REDIRECT_DOMAINS', env('MAIL_REDIRECT_DOMAINS', 'example.com'));
 define('MAIL_FROM_NAME', env('MAIL_FROM_NAME', APP_NAME));
 define('SMTP_HOST', env('SMTP_HOST', 'smtp.gmail.com'));
 define('SMTP_PORT', (int)env('SMTP_PORT', 587));
