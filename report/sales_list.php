@@ -42,7 +42,7 @@ require_once __DIR__ . '/../common/header.php';
       <td><?= h(formatDate($r['sales_date'])) ?></td>
       <td class="num"><?= h($r['sales_no']) ?></td>
       <td><?= h($r['product_code']) ?></td>
-      <td><?= h($r['product_name'] . ' ' . $r['spec']) ?><?= storageBadge($r['storage_type']) ?></td>
+      <td><?= h(productLabel($r['product_name'], $r['spec'])) ?><?= storageBadge($r['storage_type']) ?></td>
       <td class="num"><?= h(formatYen($r['list_price'])) ?></td>
       <td class="num"><?= h($r['sales_qty']) ?></td>
       <td class="num"><?= h(formatYen($r['amount'])) ?></td>

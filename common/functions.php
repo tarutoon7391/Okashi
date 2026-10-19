@@ -82,6 +82,17 @@ function toIntOrNull($v): ?int
     return $v === false ? null : $v;
 }
 
+// 商品名＋規格の表示用。商品名が規格で終わっているとき（例：味の明太子 レギュラー 120g／120g）は規格を重ねない
+function productLabel($name, $spec): string
+{
+    $name = (string)($name ?? '');
+    $spec = trim((string)($spec ?? ''));
+    if ($spec === '' || str_ends_with($name, $spec)) {
+        return $name;
+    }
+    return $name . ' ' . $spec;
+}
+
 // 保存区分 → 表示名
 function storageTypeName(int $type): string
 {

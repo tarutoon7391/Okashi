@@ -166,7 +166,7 @@ renderTabs([
             <?php foreach ($slip['details'] as $d): ?>
             <tr class="<?= minusClass($d['order_qty']) ?>">
               <td><?= h($d['product_code']) ?></td>
-              <td><?= h($d['product_name'] . ' ' . $d['spec']) ?><?= storageBadge($d['storage_type']) ?>
+              <td><?= h(productLabel($d['product_name'], $d['spec'])) ?><?= storageBadge($d['storage_type']) ?>
                 <?php if ($d['ref_order_no'] !== null): ?>
                   <br><small class="note">取消元 No.<?= h($d['ref_order_no'] . '-' . $d['ref_line_no']) ?>：発注<?= h($d['ref_order_qty']) ?>
                     ・取消済<?= h(-(int)$d['ref_cancel_qty']) ?>・納品<?= h($d['ref_delivered_qty']) ?>

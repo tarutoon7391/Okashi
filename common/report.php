@@ -88,7 +88,7 @@ function renderReportFilter(array $filter, array $options = []): void
       <option value="">すべて</option>
       <?php foreach (getProductOptions() as $p): ?>
         <option value="<?= h($p['product_code']) ?>" <?= $filter['product_code'] === $p['product_code'] ? 'selected' : '' ?>>
-          <?= h($p['product_code'] . ' ' . $p['product_name'] . ' ' . $p['spec']) ?></option>
+          <?= h($p['product_code'] . ' ' . productLabel($p['product_name'], $p['spec'])) ?></option>
       <?php endforeach; ?>
     </select></label>
   <?php endif; ?>

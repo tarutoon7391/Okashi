@@ -113,7 +113,7 @@ renderTabs([
           <?php foreach ($details[$s['order_no']] ?? [] as $d): ?>
           <tr class="<?= minusClass($d['order_qty']) ?>">
             <td><?= h($d['product_code']) ?></td>
-            <td><?= h($d['product_name'] . ' ' . $d['spec']) ?><?= storageBadge($d['storage_type']) ?>
+            <td><?= h(productLabel($d['product_name'], $d['spec'])) ?><?= storageBadge($d['storage_type']) ?>
               <?php if ($d['ref_order_no'] !== null): ?><small>（取消元 No.<?= h($d['ref_order_no'] . '-' . $d['ref_line_no']) ?>）</small><?php endif; ?>
             </td>
             <td class="num"><?= h($d['order_qty']) ?></td>

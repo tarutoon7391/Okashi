@@ -210,7 +210,7 @@ renderTabs([
         <td><input type="checkbox" name="sel[]" value="<?= h($key) ?>" class="js-check" <?= $isChecked ? 'checked' : '' ?>></td>
         <td><?= h($key) ?></td>
         <td><?= h(formatDate($u['order_date'])) ?></td>
-        <td><?= h($u['product_code'] . ' ' . $u['product_name'] . ' ' . $u['spec']) ?><?= storageBadge($u['storage_type']) ?>
+        <td><?= h($u['product_code'] . ' ' . productLabel($u['product_name'], $u['spec'])) ?><?= storageBadge($u['storage_type']) ?>
           <?php if ($u['memo']): ?><br><small>メモ：<?= h($u['memo']) ?></small><?php endif; ?></td>
         <td class="num"><?= h($u['pack_qty']) ?></td>
         <td class="num"><?= h($u['order_qty']) ?></td>

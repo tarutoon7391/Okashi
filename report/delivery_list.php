@@ -61,7 +61,7 @@ require_once __DIR__ . '/../common/header.php';
       <td><?= h($r['delivery_no'] . '-' . $r['line_no']) ?></td>
       <td><?= h($r['order_no'] . '-' . $r['order_line_no']) ?></td>
       <td><?= h($r['product_code']) ?></td>
-      <td><?= h($r['product_name'] . ' ' . $r['spec']) ?><?= storageBadge($r['storage_type']) ?></td>
+      <td><?= h(productLabel($r['product_name'], $r['spec'])) ?><?= storageBadge($r['storage_type']) ?></td>
       <td class="num"><?= h($r['delivery_qty']) ?></td>
       <td class="num"><?= h(formatYen($r['contract_price'])) ?></td>
       <td class="num"><?= h(formatYen($r['amount'])) ?></td>

@@ -197,7 +197,7 @@ renderTabs([
         <?= stockCell($p['stock_qty']) ?>
         <td class="js-sales-state"></td>
         <td class="num"><input type="number" name="sales_qty[<?= h($p['product_code']) ?>]" class="js-sales-qty" value="<?= h($value) ?>" step="1"
-            aria-label="<?= h($p['product_name'] . ' ' . $p['spec']) ?>の売上数"></td>
+            aria-label="<?= h(productLabel($p['product_name'], $p['spec'])) ?>の売上数"></td>
         <td class="num js-sales-amount"></td>
       </tr>
       <?php endforeach; ?>

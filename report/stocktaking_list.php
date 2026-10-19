@@ -39,7 +39,7 @@ require_once __DIR__ . '/../common/header.php';
       <td><?= h(formatDate($r['stocktaking_date'])) ?></td>
       <td class="num"><?= h($r['stocktaking_no']) ?></td>
       <td><?= h($r['product_code']) ?></td>
-      <td><?= h($r['product_name'] . ' ' . $r['spec']) ?><?= storageBadge($r['storage_type']) ?></td>
+      <td><?= h(productLabel($r['product_name'], $r['spec'])) ?><?= storageBadge($r['storage_type']) ?></td>
       <td class="num"><?= h($r['book_qty']) ?></td>
       <td class="num"><?= h($r['actual_qty']) ?></td>
       <td class="num"><?= (int)$r['diff_qty'] > 0 ? '+' : '' ?><?= h($r['diff_qty']) ?></td>

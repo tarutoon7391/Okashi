@@ -96,8 +96,8 @@ foreach ($days as &$d) {
     $d['after'] = $after;
     $d['minus'] = [];
     foreach ($d['details'] as $r) {
-        if ($after[$r['product_code']] < 0 && !in_array($r['product_name'] . ' ' . $r['spec'], $d['minus'], true)) {
-            $d['minus'][] = $r['product_name'] . ' ' . $r['spec'];
+        if ($after[$r['product_code']] < 0 && !in_array(productLabel($r['product_name'], $r['spec']), $d['minus'], true)) {
+            $d['minus'][] = productLabel($r['product_name'], $r['spec']);
         }
     }
     $totalLines  += (int)$d['cnt'];
@@ -155,7 +155,7 @@ renderTabs([
             <?php foreach ($d['details'] as $r): $after = $d['after'][$r['product_code']]; ?>
             <tr>
               <td><?= h($r['product_code']) ?></td>
-              <td><?= h($r['product_name'] . ' ' . $r['spec']) ?><?= storageBadge($r['storage_type']) ?></td>
+              <td><?= h(productLabel($r['product_name'], $r['spec'])) ?><?= storageBadge($r['storage_type']) ?></td>
               <td class="num <?= minusClass($r['sales_qty']) ?>"><?= h($r['sales_qty']) ?></td>
               <td class="num <?= minusClass($r['amount']) ?>"><?= h(formatYen($r['amount'])) ?></td>
               <td class="num after"><?= h($r['stock_qty']) ?> → <b class="<?= $after < 0 ? 'neg' : '' ?>"><?= h($after) ?></b></td>

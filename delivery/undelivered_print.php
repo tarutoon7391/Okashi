@@ -121,7 +121,7 @@ renderTabs([
     <tr>
       <td><?= h($u['order_no'] . '-' . $u['line_no']) ?></td>
       <td><?= h(formatDate($u['order_date'])) ?></td>
-      <td><?= h($u['product_code'] . ' ' . $u['product_name'] . ' ' . $u['spec']) ?><?= storageBadge($u['storage_type']) ?></td>
+      <td><?= h($u['product_code'] . ' ' . productLabel($u['product_name'], $u['spec'])) ?><?= storageBadge($u['storage_type']) ?></td>
       <td class="num"><?= h($u['pack_qty']) ?></td>
       <td class="num"><?= h($u['order_qty']) ?></td>
       <td class="num <?= minusClass($u['cancel_qty']) ?>"><?= (int)$u['cancel_qty'] !== 0 ? h($u['cancel_qty']) : '' ?></td>

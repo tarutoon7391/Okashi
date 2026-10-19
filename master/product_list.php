@@ -81,7 +81,7 @@ renderTabs([
       <td class="num"><?= h($p['stock_qty']) ?></td>
       <td class="nowrap">
         <a href="/master/product_edit.php?product_code=<?= h(rawurlencode($p['product_code'])) ?>" class="btn btn-small">編集</a>
-        <form method="post" action="/master/product_delete.php" class="inline-form" data-confirm="<?= h($p['product_name'] . ' ' . $p['spec']) ?> を削除します。よろしいですか？">
+        <form method="post" action="/master/product_delete.php" class="inline-form" data-confirm="<?= h(productLabel($p['product_name'], $p['spec'])) ?> を削除します。よろしいですか？">
           <input type="hidden" name="product_code" value="<?= h($p['product_code']) ?>">
           <button type="submit" class="btn btn-small btn-danger">削除</button>
         </form>

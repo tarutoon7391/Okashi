@@ -66,7 +66,7 @@ require_once __DIR__ . '/../common/header.php';
       <td><?= h(formatDate($r['order_date'])) ?></td>
       <td><?= h($r['order_no'] . '-' . $r['line_no']) ?></td>
       <td><?= h($r['product_code']) ?></td>
-      <td><?= h($r['product_name'] . ' ' . $r['spec']) ?><?= storageBadge($r['storage_type']) ?>
+      <td><?= h(productLabel($r['product_name'], $r['spec'])) ?><?= storageBadge($r['storage_type']) ?>
         <?php if ($r['ref_order_no'] !== null): ?><small>（取消元 No.<?= h($r['ref_order_no'] . '-' . $r['ref_line_no']) ?>）</small><?php endif; ?></td>
       <td class="num"><?= h($r['order_qty']) ?></td>
       <td class="num qty-minus"><?= (int)$r['order_qty'] > 0 && (int)$r['cancel_qty'] !== 0 ? h($r['cancel_qty']) : '' ?></td>

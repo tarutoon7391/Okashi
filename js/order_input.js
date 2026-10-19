@@ -11,6 +11,13 @@
         return '';
     }
 
+    // 商品名が規格で終わっているとき（例：味の明太子 レギュラー 120g／120g）は規格を重ねない
+    function productLabel(name, spec) {
+        name = name == null ? '' : String(name);
+        spec = spec == null ? '' : String(spec).trim();
+        return spec === '' || name.endsWith(spec) ? name : name + ' ' + spec;
+    }
+
     function escapeHtml(s) {
         const div = document.createElement('div');
         div.textContent = s == null ? '' : String(s);
@@ -104,7 +111,7 @@
                 const qty = p.stock_qty === null ? 0 : Number(p.stock_qty);
                 stock = '／在庫 ' + (qty <= 0 ? '<span class="stock-warning">' + qty + '</span>' : qty);
             }
-            info.innerHTML = escapeHtml(p.product_name) + ' ' + escapeHtml(p.spec || '') + storageBadge(p.storage_type)
+            info.innerHTML = escapeHtml(productLabel(p.product_name, p.spec)) + storageBadge(p.storage_type)
                 + '<br><small>入数 ' + escapeHtml(p.pack_qty) + '／単価 ' + formatYen(p.contract_price)
                 + '／' + escapeHtml(p.supplier_name) + stock + '</small>';
             markNotFound(row, false);

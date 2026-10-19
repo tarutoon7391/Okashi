@@ -234,7 +234,7 @@ renderTabs([
   </div>
   <datalist id="productList">
     <?php foreach ($products as $p): ?>
-      <option value="<?= h($p['product_code']) ?>"><?= h($p['product_name'] . ' ' . $p['spec']) ?></option>
+      <option value="<?= h($p['product_code']) ?>"><?= h(productLabel($p['product_name'], $p['spec'])) ?></option>
     <?php endforeach; ?>
   </datalist>
   <script id="cancelCandidates" type="application/json"><?= json_encode($cancelCandidates, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?></script>
