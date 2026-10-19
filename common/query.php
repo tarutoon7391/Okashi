@@ -44,7 +44,7 @@ function getOrderSlip(int $orderNo): ?array
         return null;
     }
     $st = $pdo->prepare(
-        'SELECT d.*, p.product_name, p.spec, p.pack_qty, p.unit, p.storage_type
+        'SELECT d.*, p.product_name, p.spec, p.pack_qty, p.unit, p.storage_type, p.jan_code
            FROM t_order_detail d JOIN m_product p ON p.product_code = d.product_code
           WHERE d.order_no = :no ORDER BY d.line_no'
     );
@@ -78,10 +78,11 @@ function buildOrderSheetHtml(array $slip, string $kind): string
 
     $html .= '<table border="1" cellpadding="3" width="100%">'
            . '<tr style="background-color:#e6ecf5;">'
-           . '<th width="11%">商品コード</th><th width="' . ($isOrder ? 25 : 22) . '%">商品名</th>'
-           . '<th width="10%">規格</th><th width="6%">入数</th><th width="7%">数量</th>'
-           . '<th width="10%">契約単価</th><th width="11%">納品金額</th>'
-           . '<th width="' . ($isOrder ? 20 : 17) . '%">発注時メモ</th>'
+           . '<th width="10%">商品コード</th><th width="14%">JANコード</th>'
+           . '<th width="' . ($isOrder ? 21 : 18) . '%">商品名</th>'
+           . '<th width="9%">規格</th><th width="5%">入数</th><th width="6%">数量</th>'
+           . '<th width="9%">契約単価</th><th width="10%">納品金額</th>'
+           . '<th width="' . ($isOrder ? 16 : 13) . '%">発注時メモ</th>'
            . ($isOrder ? '' : '<th width="6%">検品</th>')
            . '</tr>';
     foreach ($slip['details'] as $d) {
@@ -89,6 +90,7 @@ function buildOrderSheetHtml(array $slip, string $kind): string
         $storage = storageTypeName((int)$d['storage_type']);
         $html .= '<tr' . $color . '>'
                . '<td>' . h($d['product_code']) . '</td>'
+               . '<td>' . h($d['jan_code']) . '</td>'
                . '<td>' . h($d['product_name']) . ((int)$d['storage_type'] > 0 ? '【' . h($storage) . '】' : '') . '</td>'
                . '<td>' . h($d['spec']) . '</td>'
                . '<td align="right">' . h($d['pack_qty']) . '</td>'
@@ -99,7 +101,7 @@ function buildOrderSheetHtml(array $slip, string $kind): string
                . ($isOrder ? '' : '<td align="center">□</td>')
                . '</tr>';
     }
-    $html .= '<tr style="background-color:#f0f0f0;"><td colspan="4" align="right">合計</td>'
+    $html .= '<tr style="background-color:#f0f0f0;"><td colspan="5" align="right">合計</td>'
            . '<td align="right">' . h($slip['total_qty']) . '</td><td></td>'
            . '<td align="right">' . h(formatYen($slip['total_amount'])) . '</td>'
            . '<td colspan="' . ($isOrder ? 1 : 2) . '"></td></tr>';
