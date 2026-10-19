@@ -49,9 +49,9 @@ function buildInspectionPageHtml(array $slips): string
 
     $html .= '<table border="1" cellpadding="3" width="100%">'
            . '<tr style="background-color:#e6ecf5;">'
-           . '<th width="7%">伝票No</th><th width="9%">商品コード</th><th width="14%">JANコード</th>'
-           . '<th width="15%">商品名</th>'
-           . '<th width="8%">規格</th><th width="4%">入数</th><th width="5%">数量</th>'
+           . '<th width="7%">伝票No</th><th width="9%">商品コード</th><th width="17%">JANコード</th>'
+           . '<th width="13%">商品名</th>'
+           . '<th width="7%">規格</th><th width="4%">入数</th><th width="5%">数量</th>'
            . '<th width="8%">契約単価</th><th width="9%">納品金額</th><th width="8%">発注時メモ</th>'
            . '<th width="4%">検品</th><th width="9%">備考</th>'
            . '</tr>';

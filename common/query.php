@@ -78,11 +78,11 @@ function buildOrderSheetHtml(array $slip, string $kind): string
 
     $html .= '<table border="1" cellpadding="3" width="100%">'
            . '<tr style="background-color:#e6ecf5;">'
-           . '<th width="10%">商品コード</th><th width="14%">JANコード</th>'
-           . '<th width="' . ($isOrder ? 21 : 18) . '%">商品名</th>'
-           . '<th width="9%">規格</th><th width="5%">入数</th><th width="6%">数量</th>'
+           . '<th width="10%">商品コード</th><th width="18%">JANコード</th>'
+           . '<th width="' . ($isOrder ? 19 : 16) . '%">商品名</th>'
+           . '<th width="8%">規格</th><th width="5%">入数</th><th width="6%">数量</th>'
            . '<th width="9%">契約単価</th><th width="10%">納品金額</th>'
-           . '<th width="' . ($isOrder ? 16 : 13) . '%">発注時メモ</th>'
+           . '<th width="' . ($isOrder ? 15 : 12) . '%">発注時メモ</th>'
            . ($isOrder ? '' : '<th width="6%">検品</th>')
            . '</tr>';
     foreach ($slip['details'] as $d) {
