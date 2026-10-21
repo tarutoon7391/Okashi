@@ -204,8 +204,9 @@ function outputReportPdf(string $title, string $fileBase, array $filter, array $
     $cellsHtml = function (array $cells, string $rowStyle = '') use ($columns): string {
         $out = '<tr' . ($rowStyle !== '' ? ' style="' . $rowStyle . '"' : '') . '>';
         foreach ($cells as $i => $text) {
+            // TCPDF は見出し行の幅を本体行に引き継がないので、全セルに幅を付ける
             $align = $columns[$i]['align'] ?? 'left';
-            $out .= '<td align="' . $align . '">' . h((string)$text) . '</td>';
+            $out .= '<td width="' . (int)$columns[$i]['width'] . '%" align="' . $align . '">' . h((string)$text) . '</td>';
         }
         return $out . '</tr>';
     };
