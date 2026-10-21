@@ -3,6 +3,7 @@
 // 指定期間内の発注伝票を卸業者別に一覧表示（取消のマイナス行も含めて表示）
 // 起票者・確定者（created_by / confirmed_by → m_operator.operator_name）と、プラスの行には取消済数
 // （確定済みのマイナス明細で ref_order_no / ref_line_no がその行を指すものの合計）を出す
+// ?pdf=1 で同じ内容を PDF（横向き A4）にする
 require_once __DIR__ . '/../common/auth.php';
 require_once __DIR__ . '/../common/db.php';
 require_once __DIR__ . '/../common/functions.php';
@@ -41,6 +42,41 @@ foreach ($st->fetchAll() as $r) {
 }
 $grandQty = 0;
 $grandAmount = 0;
+
+// PDF（?pdf=1）：画面と同じ条件・同じ行を横向き A4 で出す
+if (isReportPdfRequested()) {
+    $pdfGroups = [];
+    $pdfQty = 0;
+    $pdfAmount = 0;
+    foreach ($groups as $code => $g) {
+        $rows = [];
+        foreach ($g['rows'] as $r) {
+            $rows[] = ['minus' => (int)$r['order_qty'] < 0, 'cells' => [
+                formatDate($r['order_date']), $r['order_no'] . '-' . $r['line_no'], $r['product_code'],
+                pdfProductText($r['product_name'], $r['spec'], $r['storage_type'])
+                    . ($r['ref_order_no'] !== null ? '（取消元 No.' . $r['ref_order_no'] . '-' . $r['ref_line_no'] . '）' : ''),
+                $r['order_qty'],
+                (int)$r['order_qty'] > 0 && (int)$r['cancel_qty'] !== 0 ? $r['cancel_qty'] : '',
+                formatYen($r['contract_price']), formatYen($r['amount']), $r['memo'],
+                $r['created_name'] ?? $r['created_by'] ?? '', $r['confirmed_name'] ?? $r['confirmed_by'] ?? '',
+                (int)$r['is_confirmed'] === 1 ? '確定済' : '未確定',
+            ]];
+        }
+        $subQty = array_sum(array_column($g['rows'], 'order_qty'));
+        $subAmount = array_sum(array_column($g['rows'], 'amount'));
+        $pdfQty += $subQty;
+        $pdfAmount += $subAmount;
+        $pdfGroups[] = ['label' => $code . ' ' . $g['name'], 'rows' => $rows,
+            'subtotal' => ['', '', '', '小計', $subQty, '', '', formatYen($subAmount), '', '', '', '']];
+    }
+    outputReportPdf('発注明細表', 'order_list', $filter, [], [
+        ['label' => '発注日', 'width' => 8], ['label' => '伝票No', 'width' => 6], ['label' => '商品コード', 'width' => 7],
+        ['label' => '商品名', 'width' => 23], ['label' => '数量', 'width' => 5, 'align' => 'right'],
+        ['label' => '取消済数', 'width' => 6, 'align' => 'right'], ['label' => '契約単価', 'width' => 8, 'align' => 'right'],
+        ['label' => '納品金額', 'width' => 9, 'align' => 'right'], ['label' => '発注時メモ', 'width' => 11],
+        ['label' => '起票者', 'width' => 6], ['label' => '確定者', 'width' => 6], ['label' => '状態', 'width' => 5, 'align' => 'center'],
+    ], $pdfGroups, ['', '', '', '合計', $pdfQty, '', '', formatYen($pdfAmount), '', '', '', '']);
+}
 
 $pageTitle = '発注明細表';
 require_once __DIR__ . '/../common/header.php';
@@ -88,6 +124,7 @@ require_once __DIR__ . '/../common/header.php';
 </div>
 <div class="action-bar"><div class="bar-in">
   <span class="bar-spacer"></span>
+  <?= reportPdfButton() ?>
   <a href="/menu.php" class="btn">メニューへ戻る</a>
 </div></div>
 <?php require_once __DIR__ . '/../common/footer.php'; ?>

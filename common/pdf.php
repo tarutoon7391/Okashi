@@ -1,6 +1,7 @@
 <?php
 // PDF出力（05 §1・§8）。lib/ の TCPDF のラッパ。日本語フォントは kozminproregular（質問No.6）
-// 使うのは order_print.php / inspection_print.php / undelivered_print.php と sendOrderMail()
+// 使うのは order_print.php / inspection_print.php / undelivered_print.php と sendOrderMail()、
+// 管理業務の明細表5画面（report/*_list.php の ?pdf=1。横向き）
 //
 // ※ lib/ が無い環境（composer install していないローカル）では、
 //    $dest='I' は印刷用HTMLをそのまま表示し、$dest='S' は null を返す（メールは添付なしになる）
@@ -12,7 +13,8 @@ if (is_file(__DIR__ . '/../lib/autoload.php')) {
 
 // $html は帳票の本文HTML（TCPDF が読める単純な table 中心のHTML）
 // $dest：'I' = ブラウザに表示して終了 / 'S' = PDFのバイナリ文字列を返す（メール添付用）
-function outputPdf(string $title, string $html, string $fileName, string $dest = 'I'): ?string
+// $orientation：'P' = 縦（既定）/ 'L' = 横（列の多い明細表用）
+function outputPdf(string $title, string $html, string $fileName, string $dest = 'I', string $orientation = 'P'): ?string
 {
     if (!class_exists('TCPDF')) {
         if ($dest === 'S') {
@@ -21,6 +23,7 @@ function outputPdf(string $title, string $html, string $fileName, string $dest =
         header('Content-Type: text/html; charset=UTF-8');
         echo '<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>' . h($title) . '</title>'
            . '<style>body{font-family:sans-serif;margin:24px}table{border-collapse:collapse}'
+           . ($orientation === 'L' ? '@page{size:A4 landscape}' : '')
            . 'td,th{padding:4px 6px}.no-print{margin-bottom:12px;padding:8px;background:#fff1dc}'
            . '@media print{.no-print{display:none}}</style></head><body>'
            . '<div class="no-print">PDFライブラリ（lib/）が無いため印刷用HTMLで表示しています。'
@@ -29,7 +32,7 @@ function outputPdf(string $title, string $html, string $fileName, string $dest =
         exit;
     }
 
-    $pdf = new TCPDF('P', 'mm', 'A4', true, 'UTF-8', false);
+    $pdf = new TCPDF($orientation === 'L' ? 'L' : 'P', 'mm', 'A4', true, 'UTF-8', false);
     $pdf->SetCreator(APP_NAME);
     $pdf->SetTitle($title);
     $pdf->setPrintHeader(false);

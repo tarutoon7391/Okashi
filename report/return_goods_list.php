@@ -2,6 +2,7 @@
 // SC-64 返品明細表（F-64）担当E
 // 指定期間内の返品（t_delivery.is_return=1）を卸業者別に一覧表示
 // 伝票には数量・金額がマイナスで入っているので、表示時に符号を反転する（質問No.4）
+// ?pdf=1 で同じ内容を PDF（横向き A4）にする
 require_once __DIR__ . '/../common/auth.php';
 require_once __DIR__ . '/../common/db.php';
 require_once __DIR__ . '/../common/functions.php';
@@ -36,6 +37,39 @@ foreach ($st->fetchAll() as $r) {
 }
 $grandQty = 0;
 $grandAmount = 0;
+
+// PDF（?pdf=1）：画面と同じ条件・同じ行を横向き A4 で出す
+if (isReportPdfRequested()) {
+    $pdfGroups = [];
+    $pdfQty = 0;
+    $pdfAmount = 0;
+    foreach ($groups as $code => $g) {
+        $rows = [];
+        foreach ($g['rows'] as $r) {
+            $rows[] = ['minus' => false, 'cells' => [
+                formatDate($r['delivery_date']), $r['delivery_no'] . '-' . $r['line_no'], $r['order_no'] . '-' . $r['order_line_no'],
+                $r['product_code'], pdfProductText($r['product_name'], $r['spec'], $r['storage_type']),
+                $r['return_qty'], formatYen($r['contract_price']), formatYen($r['return_amount']), $r['memo'],
+                $r['created_name'] ?? $r['created_by'] ?? '', $r['confirmed_name'] ?? $r['confirmed_by'] ?? '',
+                (int)$r['is_confirmed'] === 1 ? '確定済' : '未確定',
+            ]];
+        }
+        $subQty = array_sum(array_column($g['rows'], 'return_qty'));
+        $subAmount = array_sum(array_column($g['rows'], 'return_amount'));
+        $pdfQty += $subQty;
+        $pdfAmount += $subAmount;
+        $pdfGroups[] = ['label' => $code . ' ' . $g['name'], 'rows' => $rows,
+            'subtotal' => ['', '', '', '', '小計', $subQty, '', formatYen($subAmount), '', '', '', '']];
+    }
+    outputReportPdf('返品明細表', 'return_goods_list', $filter, [], [
+        ['label' => '返品日', 'width' => 8], ['label' => '返品伝票No', 'width' => 7], ['label' => '元の発注No', 'width' => 7],
+        ['label' => '商品コード', 'width' => 7], ['label' => '商品名', 'width' => 22],
+        ['label' => '返品数', 'width' => 5, 'align' => 'right'], ['label' => '契約単価', 'width' => 8, 'align' => 'right'],
+        ['label' => '返品金額', 'width' => 9, 'align' => 'right'], ['label' => '返品理由', 'width' => 10],
+        ['label' => '起票者', 'width' => 6], ['label' => '確定者', 'width' => 6], ['label' => '状態', 'width' => 5, 'align' => 'center'],
+    ], $pdfGroups, ['', '', '', '', '合計', $pdfQty, '', formatYen($pdfAmount), '', '', '', ''],
+    '※ 返品数・返品金額はプラスで表示しています（伝票上はマイナス）。金額は税を含みません。');
+}
 
 $pageTitle = '返品明細表';
 require_once __DIR__ . '/../common/header.php';
@@ -82,6 +116,7 @@ require_once __DIR__ . '/../common/header.php';
 </div>
 <div class="action-bar"><div class="bar-in">
   <span class="bar-spacer"></span>
+  <?= reportPdfButton() ?>
   <a href="/menu.php" class="btn">メニューへ戻る</a>
 </div></div>
 <?php require_once __DIR__ . '/../common/footer.php'; ?>

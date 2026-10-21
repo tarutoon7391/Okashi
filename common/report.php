@@ -105,3 +105,132 @@ function renderReportFilter(array $filter, array $options = []): void
 </form>
     <?php
 }
+
+// ---------------------------------------------------------------
+// 明細表の PDF 出力（SC-60/62/64/66/68 の ?pdf=1）
+//   画面と同じ絞り込み条件で、同じ行を横向き A4 の PDF にする。
+//   使い方：各 report/*_list.php で行を取ったあと
+//     if (isReportPdfRequested()) { outputReportPdf($title, $fileBase, $filter, $options, $columns, $groups, $foot); }
+// ---------------------------------------------------------------
+
+// ?pdf=1 が付いているか
+function isReportPdfRequested(): bool
+{
+    return isset($_GET['pdf']) && $_GET['pdf'] !== '';
+}
+
+// 「PDF出力」ボタン（今の絞り込み条件をそのまま引き継ぐ）。h() 済みのHTMLを返す
+function reportPdfButton(): string
+{
+    $self  = strtok($_SERVER['REQUEST_URI'], '?');
+    $query = $_GET;
+    unset($query['pdf']);
+    $query['pdf'] = '1';
+    return '<a href="' . h($self . '?' . http_build_query($query)) . '" target="_blank" class="btn btn-primary">PDF出力</a>';
+}
+
+// 絞り込み条件を1行の文（PDF の見出し用）にする。$options は renderReportFilter() と同じ
+function reportFilterText(array $filter, array $options = []): string
+{
+    $options += ['supplier' => true, 'product' => true, 'status' => true];
+    $parts = ['期間：' . formatDate($filter['date_from']) . '〜' . formatDate($filter['date_to'])];
+    if ($options['supplier']) {
+        $name = 'すべて';
+        if ($filter['supplier_code'] !== '') {
+            $name = $filter['supplier_code'];
+            foreach (getSupplierOptions() as $s) {
+                if ($s['supplier_code'] === $filter['supplier_code']) {
+                    $name .= ' ' . $s['supplier_name'];
+                    break;
+                }
+            }
+        }
+        $parts[] = '卸業者：' . $name;
+    }
+    if ($options['product']) {
+        $name = 'すべて';
+        if ($filter['product_code'] !== '') {
+            $name = $filter['product_code'];
+            foreach (getProductOptions() as $p) {
+                if ($p['product_code'] === $filter['product_code']) {
+                    $name .= ' ' . productLabel($p['product_name'], $p['spec']);
+                    break;
+                }
+            }
+        }
+        $parts[] = '商品：' . $name;
+    }
+    if ($options['status']) {
+        $parts[] = '状態：' . ['1' => '確定済のみ', 'all' => '未確定も含めてすべて', '0' => '未確定のみ'][$filter['status']];
+    }
+    return implode('　', $parts);
+}
+
+// PDF 用：商品名＋保存区分（画面の storageBadge の代わりに【冷蔵】のような文字で出す）
+function pdfProductText($name, $spec, $storageType): string
+{
+    $type = (int)$storageType;
+    return productLabel($name, $spec) . ($type > 0 ? '【' . storageTypeName($type) . '】' : '');
+}
+
+// 明細表 PDF を作って表示する（ここで exit する）
+//   $title    … 帳票名（発注明細表 など）
+//   $fileBase … ファイル名の先頭（order_list など。ASCII）
+//   $options  … renderReportFilter() と同じ（絞り込み条件の文に使う）
+//   $columns  … [['label' => '発注日', 'width' => 9, 'align' => 'right'], ...]  width は % で合計 100
+//   $groups   … [['label' => 'W001 株式会社…'（null なら見出し行なし）,
+//                  'rows'  => [['cells' => [...], 'minus' => true/false], ...],  cells は列と同じ数の文字列（未エスケープ）
+//                  'subtotal' => [...cells...] か null], ...]
+//   $foot     … 合計行の cells（null なら出さない）
+//   $note     … 表の下の注記（省略時は取消・訂正の説明）
+function outputReportPdf(string $title, string $fileBase, array $filter, array $options, array $columns, array $groups, ?array $foot,
+                         string $note = '※ 赤字の行はマイナス（取消・訂正）です。金額は税を含みません。'): void
+{
+    require_once __DIR__ . '/pdf.php';
+
+    $html  = '<h1 style="text-align:center;font-size:15pt;">' . h($title) . '</h1>';
+    $html .= '<table cellpadding="2" width="100%"><tr>'
+           . '<td width="70%">' . h(reportFilterText($filter, $options)) . '</td>'
+           . '<td width="30%" align="right">出力日時：' . h(date('Y/m/d H:i')) . '<br>'
+           . h(SHOP_NAME) . '</td></tr></table><br>';
+
+    $colCount = count($columns);
+    $html .= '<table border="1" cellpadding="3" width="100%" style="font-size:8pt;"><thead><tr style="background-color:#e6ecf5;">';
+    foreach ($columns as $c) {
+        $html .= '<th width="' . (int)$c['width'] . '%" align="center">' . h($c['label']) . '</th>';
+    }
+    $html .= '</tr></thead><tbody>';
+
+    $cellsHtml = function (array $cells, string $rowStyle = '') use ($columns): string {
+        $out = '<tr' . ($rowStyle !== '' ? ' style="' . $rowStyle . '"' : '') . '>';
+        foreach ($cells as $i => $text) {
+            $align = $columns[$i]['align'] ?? 'left';
+            $out .= '<td align="' . $align . '">' . h((string)$text) . '</td>';
+        }
+        return $out . '</tr>';
+    };
+
+    $hasRow = false;
+    foreach ($groups as $g) {
+        if (!empty($g['label'])) {
+            $html .= '<tr style="background-color:#f3f5f8;"><td colspan="' . $colCount . '"><b>' . h($g['label']) . '</b></td></tr>';
+        }
+        foreach ($g['rows'] as $r) {
+            $hasRow = true;
+            $html .= $cellsHtml($r['cells'], !empty($r['minus']) ? 'color:#c53030;' : '');
+        }
+        if (!empty($g['subtotal'])) {
+            $html .= $cellsHtml($g['subtotal'], 'background-color:#fafafa;');
+        }
+    }
+    if (!$hasRow) {
+        $html .= '<tr><td colspan="' . $colCount . '" align="center">該当するデータがありません</td></tr>';
+    }
+    if ($foot !== null && $hasRow) {
+        $html .= $cellsHtml($foot, 'background-color:#f0f0f0;font-weight:bold;');
+    }
+    $html .= '</tbody></table>';
+    $html .= '<p style="font-size:8pt;">' . h($note) . '</p>';
+
+    outputPdf($title, $html, $fileBase . '_' . $filter['date_from'] . '_' . $filter['date_to'] . '.pdf', 'I', 'L');
+}

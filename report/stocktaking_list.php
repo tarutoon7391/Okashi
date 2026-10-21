@@ -1,6 +1,7 @@
 <?php
 // SC-68 棚卸調整一覧表（F-68）担当D
 // 棚卸で調整した商品の 帳簿数・実数・差異・理由 を表示する（t_stocktaking には差異がある商品だけ入っている）
+// ?pdf=1 で同じ内容を PDF（横向き A4）にする
 require_once __DIR__ . '/../common/auth.php';
 require_once __DIR__ . '/../common/db.php';
 require_once __DIR__ . '/../common/functions.php';
@@ -22,6 +23,27 @@ $st = $pdo->prepare(
 );
 $st->execute($params);
 $rows = $st->fetchAll();
+
+// PDF（?pdf=1）：画面と同じ条件・同じ行を横向き A4 で出す
+if (isReportPdfRequested()) {
+    $pdfRows = [];
+    foreach ($rows as $r) {
+        $pdfRows[] = ['minus' => (int)$r['diff_qty'] < 0, 'cells' => [
+            formatDate($r['stocktaking_date']), $r['stocktaking_no'], $r['product_code'],
+            pdfProductText($r['product_name'], $r['spec'], $r['storage_type']),
+            $r['book_qty'], $r['actual_qty'], ((int)$r['diff_qty'] > 0 ? '+' : '') . $r['diff_qty'],
+            $r['reason'], $r['operator_name'] ?? $r['created_by'],
+        ]];
+    }
+    outputReportPdf('棚卸調整一覧表', 'stocktaking_list', $filter, ['supplier' => false, 'status' => false], [
+        ['label' => '棚卸日', 'width' => 10], ['label' => '棚卸No', 'width' => 7, 'align' => 'right'],
+        ['label' => '商品コード', 'width' => 9], ['label' => '商品名', 'width' => 28],
+        ['label' => '帳簿数', 'width' => 7, 'align' => 'right'], ['label' => '実数', 'width' => 7, 'align' => 'right'],
+        ['label' => '差異', 'width' => 7, 'align' => 'right'], ['label' => '差異の原因・理由', 'width' => 17], ['label' => '担当', 'width' => 8],
+    ], [['label' => null, 'rows' => $pdfRows, 'subtotal' => null]],
+    ['', '', '', '', '', '差異合計', array_sum(array_column($rows, 'diff_qty')), '', ''],
+    '※ 赤字の行は差異がマイナス（実数が帳簿数より少ない）の商品です。');
+}
 
 $pageTitle = '棚卸調整一覧表';
 require_once __DIR__ . '/../common/header.php';
@@ -55,6 +77,7 @@ require_once __DIR__ . '/../common/header.php';
 </div>
 <div class="action-bar"><div class="bar-in">
   <span class="bar-spacer"></span>
+  <?= reportPdfButton() ?>
   <a href="/menu.php" class="btn">メニューへ戻る</a>
 </div></div>
 <?php require_once __DIR__ . '/../common/footer.php'; ?>

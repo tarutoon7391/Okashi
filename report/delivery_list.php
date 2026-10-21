@@ -1,6 +1,7 @@
 <?php
 // SC-62 納品明細表（F-62）担当E
 // 指定期間内の納品伝票を卸業者別に一覧表示。返品伝票（is_return=1）は含めない
+// ?pdf=1 で同じ内容を PDF（横向き A4）にする
 require_once __DIR__ . '/../common/auth.php';
 require_once __DIR__ . '/../common/db.php';
 require_once __DIR__ . '/../common/functions.php';
@@ -35,6 +36,38 @@ foreach ($st->fetchAll() as $r) {
 }
 $grandQty = 0;
 $grandAmount = 0;
+
+// PDF（?pdf=1）：画面と同じ条件・同じ行を横向き A4 で出す
+if (isReportPdfRequested()) {
+    $pdfGroups = [];
+    $pdfQty = 0;
+    $pdfAmount = 0;
+    foreach ($groups as $code => $g) {
+        $rows = [];
+        foreach ($g['rows'] as $r) {
+            $rows[] = ['minus' => (int)$r['delivery_qty'] < 0, 'cells' => [
+                formatDate($r['delivery_date']), $r['delivery_no'] . '-' . $r['line_no'], $r['order_no'] . '-' . $r['order_line_no'],
+                $r['product_code'], pdfProductText($r['product_name'], $r['spec'], $r['storage_type']),
+                $r['delivery_qty'], formatYen($r['contract_price']), formatYen($r['amount']), $r['memo'],
+                $r['created_name'] ?? $r['created_by'] ?? '', $r['confirmed_name'] ?? $r['confirmed_by'] ?? '',
+                (int)$r['is_confirmed'] === 1 ? '確定済' : '未確定',
+            ]];
+        }
+        $subQty = array_sum(array_column($g['rows'], 'delivery_qty'));
+        $subAmount = array_sum(array_column($g['rows'], 'amount'));
+        $pdfQty += $subQty;
+        $pdfAmount += $subAmount;
+        $pdfGroups[] = ['label' => $code . ' ' . $g['name'], 'rows' => $rows,
+            'subtotal' => ['', '', '', '', '小計', $subQty, '', formatYen($subAmount), '', '', '', '']];
+    }
+    outputReportPdf('納品明細表', 'delivery_list', $filter, [], [
+        ['label' => '納品日', 'width' => 8], ['label' => '納品No', 'width' => 6], ['label' => '発注No', 'width' => 6],
+        ['label' => '商品コード', 'width' => 7], ['label' => '商品名', 'width' => 23],
+        ['label' => '数量', 'width' => 5, 'align' => 'right'], ['label' => '契約単価', 'width' => 8, 'align' => 'right'],
+        ['label' => '納品金額', 'width' => 9, 'align' => 'right'], ['label' => 'メモ', 'width' => 11],
+        ['label' => '起票者', 'width' => 6], ['label' => '確定者', 'width' => 6], ['label' => '状態', 'width' => 5, 'align' => 'center'],
+    ], $pdfGroups, ['', '', '', '', '合計', $pdfQty, '', formatYen($pdfAmount), '', '', '', '']);
+}
 
 $pageTitle = '納品明細表';
 require_once __DIR__ . '/../common/header.php';
@@ -81,6 +114,7 @@ require_once __DIR__ . '/../common/header.php';
 </div>
 <div class="action-bar"><div class="bar-in">
   <span class="bar-spacer"></span>
+  <?= reportPdfButton() ?>
   <a href="/menu.php" class="btn">メニューへ戻る</a>
 </div></div>
 <?php require_once __DIR__ . '/../common/footer.php'; ?>
