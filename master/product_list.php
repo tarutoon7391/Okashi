@@ -1,6 +1,6 @@
 <?php
 // SC-70 商品一覧（F-70）担当A
-// 削除済を除き、商品名カナの昇順（質問No.1）。商品名・卸業者で検索
+// 削除済を除き、商品名カナの昇順（質問No.1）。商品名・カナ・コード・JAN・卸業者で検索
 require_once __DIR__ . '/../common/auth.php';
 require_once __DIR__ . '/../common/db.php';
 require_once __DIR__ . '/../common/functions.php';
@@ -18,8 +18,8 @@ $sql = 'SELECT p.*, s.supplier_name, COALESCE(t.stock_qty, 0) AS stock_qty
          WHERE p.is_deleted = 0';
 $params = [];
 if ($keyword !== '') {
-    $sql .= ' AND (p.product_name LIKE :kw1 OR p.product_kana LIKE :kw2 OR p.product_code LIKE :kw3)';
-    $params += [':kw1' => "%{$keyword}%", ':kw2' => "%{$keyword}%", ':kw3' => "%{$keyword}%"];
+    $sql .= ' AND (p.product_name LIKE :kw1 OR p.product_kana LIKE :kw2 OR p.product_code LIKE :kw3 OR p.jan_code LIKE :kw4)';
+    $params += [':kw1' => "%{$keyword}%", ':kw2' => "%{$keyword}%", ':kw3' => "%{$keyword}%", ':kw4' => "%{$keyword}%"];
 }
 if ($supplierCode !== '') {
     $sql .= ' AND p.supplier_code = :supplier_code';
@@ -45,7 +45,7 @@ renderTabs([
 ]);
 ?>
 <form method="get" class="filter-form">
-  <label>商品名 <input type="search" name="keyword" value="<?= h($keyword) ?>" placeholder="商品名・カナ・コード"></label>
+  <label>商品名 <input type="search" name="keyword" value="<?= h($keyword) ?>" placeholder="商品名・カナ・コード・JAN" autofocus></label>
   <label>卸業者
     <select name="supplier_code">
       <option value="">すべて</option>
@@ -62,14 +62,14 @@ renderTabs([
 <div class="card tbl-scroll">
 <table class="data-table">
   <thead>
-    <tr><th>写真</th><th>商品コード</th><th>商品名（カナ）</th><th>規格</th><th>入数</th><th>定価</th><th>契約単価</th><th>契約卸</th><th>保存区分</th><th>賞味期限日数</th><th>在庫</th><th></th></tr>
+    <tr><th>写真</th><th>商品コード / JAN</th><th>商品名（カナ）</th><th>規格</th><th>入数</th><th>定価</th><th>契約単価</th><th>契約卸</th><th>保存区分</th><th>賞味期限日数</th><th>在庫</th><th></th></tr>
   </thead>
   <tbody>
     <?php if (!$products): ?><tr><td colspan="12">該当する商品がありません</td></tr><?php endif; ?>
     <?php foreach ($products as $p): ?>
     <tr class="<?= (int)$p['stock_qty'] <= 0 ? 'stock-warning' : '' ?>">
       <td><?php if ($p['photo_path']): ?><img src="/img/product/<?= h(rawurlencode($p['photo_path'])) ?>?v=<?= h(photoVersion($p['photo_path'])) ?>" alt="" class="thumb"><?php endif; ?></td>
-      <td><?= h($p['product_code']) ?></td>
+      <td><?= h($p['product_code']) ?><?php if ($p['jan_code']): ?><br><small>JAN <?= h($p['jan_code']) ?></small><?php endif; ?></td>
       <td><?= h($p['product_name']) ?><br><small><?= h($p['product_kana']) ?></small></td>
       <td><?= h($p['spec']) ?></td>
       <td class="num"><?= h($p['pack_qty'] . $p['unit']) ?></td>
